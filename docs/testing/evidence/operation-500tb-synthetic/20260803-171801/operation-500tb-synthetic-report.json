@@ -1,0 +1,65 @@
+{
+  "operation" : "OPERATION_500TB_SYNTHETIC",
+  "generatedAt" : "2026-08-03T21:20:23.429340200Z",
+  "commit" : "20d3102371e0",
+  "verdict" : "SYNTHETIC_LOGICAL_SCALE_PASS_PHYSICAL_CERTIFICATION_PENDING",
+  "physical500TbClaimAllowed" : false,
+  "claimBoundary" : "The harness plans 500 TB and streams a bounded deterministic sample; it does not write 500 TB to a database or file receiver.",
+  "logicalDataset" : {
+    "tables" : 5000,
+    "families" : [ "CUSTOMER", "ACCOUNT", "CARD", "TRANSACTION", "AUDIT" ],
+    "dbRowLimitPerTable" : 100000000,
+    "averageRowBytes" : 1000,
+    "totalRows" : "500000000000",
+    "rowsPerTable" : 100000000,
+    "decimalTb" : 500,
+    "shards" : 1000,
+    "bytes" : "500000000000000"
+  },
+  "partitioning" : {
+    "workers" : 32,
+    "coveredRows" : "500000000000",
+    "manifestSha256" : "ef679571c79c85b8c9dc525757a44af74a29e8f02086a73535f0868c2b164bd6",
+    "descriptorBytes" : 40,
+    "partitions" : 160000,
+    "maxResidentRanges" : 32
+  },
+  "deterministicReplay" : {
+    "sampleRows" : 1000000,
+    "receiverIndependent" : true,
+    "fkChecks" : 3000000,
+    "differentSeedProducesDifferentOutput" : true,
+    "singleEqualsPartitioned" : true,
+    "sha256" : "9f2d64ac1c18ae497f496ad99b296190ec341488ad303410edd44f98d559b24a",
+    "workingRecordBufferBytes" : 48
+  },
+  "relationships" : {
+    "distribution" : "APPROXIMATE beyond the bounded parent index cap",
+    "validity" : "EXACT: every sampled child key exists in the retained parent-key domain",
+    "parentIndexCap" : 200000,
+    "dependencyWaves" : 4
+  },
+  "uniqueness" : {
+    "capacityPass" : true,
+    "cardRows" : "100000000000",
+    "primaryKey" : "Injective BIGINT row sequence within every table",
+    "configuredBins" : 1000,
+    "panCapacity" : "1000000000000"
+  },
+  "restart" : {
+    "duplicatePartitions" : 0,
+    "coveredRows" : "500000000000",
+    "finalCommittedPartitions" : 160000,
+    "checkpointBytes" : 156,
+    "replayedPartitions" : 80000,
+    "committedBeforeFailure" : 80000
+  },
+  "receiverBackpressure" : {
+    "droppedBatches" : 0,
+    "batches" : 10000,
+    "queueCapacity" : 8,
+    "blockedOffers" : 9990,
+    "maxQueueDepth" : 8
+  },
+  "requiredNextGate" : "Run 1%, 10%, 1 TB, 5 TB, then 500 TB on production-equivalent targets with actual generators, LOB mix, constraints, native loaders, telemetry, cancellation, restart, and reconciliation."
+}

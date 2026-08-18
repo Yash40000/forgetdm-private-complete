@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: forgetdm-data
+  labels:
+    app.kubernetes.io/name: forgetdm
+spec:
+  # ReadWriteMany so every replica shares one content-addressed staging pool (snapshots visible
+  # cluster-wide). On bare-metal HCI this is typically CephFS / NFS / ODF. If you run a single
+  # replica, ReadWriteOnce is sufficient.
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 200Gi
+  # Set to your HCI shared-filesystem StorageClass (e.g. ocs-storagecluster-cephfs).
+  # storageClassName: ocs-storagecluster-cephfs

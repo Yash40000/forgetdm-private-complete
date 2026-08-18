@@ -1,0 +1,19 @@
+{
+  "generatedAt" : "2026-08-04T15:24:57.827580600Z",
+  "engine" : "PostgreSQL",
+  "mechanism" : "PostgreSQL logical replication (test_decoding)",
+  "status" : "PASS",
+  "realDatabase" : true,
+  "capturedChanges" : 1125,
+  "operations" : {
+    "I" : 1000,
+    "U" : 100,
+    "D" : 25
+  },
+  "maxChangesPerPoll" : 200,
+  "largestObservedPoll" : 1000,
+  "transactionAtomicity" : "A complete source transaction may exceed maxChanges; checkpoints never split a transaction.",
+  "confirmedLsn" : "7/2A09EC18",
+  "lagBytes" : 0,
+  "scaleClaim" : "bounded real-WAL functional proof; not a physical 5 TB delta throughput test"
+}

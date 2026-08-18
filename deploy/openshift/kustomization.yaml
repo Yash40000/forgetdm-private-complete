@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# `oc apply -k deploy/openshift/` applies everything except the Secret (create that out-of-band).
+resources:
+  - configmap.yaml
+  - pvc.yaml
+  - deployment.yaml
+  - service.yaml
+  - route.yaml
+  - hpa.yaml
+commonLabels:
+  app.kubernetes.io/part-of: forgetdm
+# Pin the image tag centrally:
+# images:
+#   - name: image-registry.openshift-image-registry.svc:5000/forgetdm/forgetdm
+#     newTag: "1.0.0"

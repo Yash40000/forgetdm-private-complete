@@ -1,0 +1,161 @@
+package io.forgetdm.ai;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.forgetdm.audit.AuditService;
+import org.h2.jdbcx.JdbcDataSource;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.init.ScriptUtils;
+
+import java.sql.Connection;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+class ForgeIntelligenceStoreServiceTest {
+    private JdbcTemplate jdbc;
+    private AuditService audit;
+    private ForgeIntelligenceStoreService store;
+
+    @BeforeEach
+    void setUp() throws Exception {
+        JdbcDataSource ds = new JdbcDataSource();
+        ds.setURL("jdbc:h2:mem:forge_ai_store;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE");
+        jdbc = new JdbcTemplate(ds);
+        jdbc.execute("DROP ALL OBJECTS");
+        try (Connection connection = ds.getConnection()) {
+            ScriptUtils.executeSqlScript(connection, new ClassPathResource("db/migration/V58__forge_intelligence_store.sql"));
+            ScriptUtils.executeSqlScript(connection, new ClassPathResource("db/migration/V59__forge_intelligence_store_exclusions.sql"));
+        }
+        createMetadataTables();
+        audit = mock(AuditService.class);
+        store = new ForgeIntelligenceStoreService(jdbc, new ObjectMapper(), audit);
+    }
+
+    @Test
+    void synchronizesMetadataWithoutSecretsAndKeepsStableCitations() {
+        jdbc.update("INSERT INTO data_sources VALUES (1,'CoreBank','POSTGRES','SOURCE','PROD','banking')");
+        jdbc.update("INSERT INTO dataset_definitions VALUES (10,'Customer360','Customer entity slice','retail','customers',NULL,1)");
+        jdbc.update("INSERT INTO table_profiles VALUES (10,'customers',TRUE,NULL)");
+        jdbc.update("INSERT INTO masking_policies VALUES (20,'Retail PII','Banking privacy policy')");
+        jdbc.update("INSERT INTO masking_rules VALUES (20,'customers','ssn','SSN',TRUE)");
+        jdbc.update("INSERT INTO business_entities VALUES (30,'Retail Customer','Customer across banking apps','Retail',10,'customers','customer_id','ACTIVE','steward')");
+        jdbc.update("INSERT INTO business_entity_members VALUES (30,301,'Core Banking',1,'retail',10,'CUSTOMER','customers','customer_id',TRUE,TRUE,1)");
+        jdbc.update("INSERT INTO classifications VALUES (1,'CoreBank','customers','ssn','varchar','SSN',0.99,'SSN','APPROVED')");
+
+        var first = store.sync();
+        assertTrue(((Number) first.get("documents")).longValue() >= 5);
+        @SuppressWarnings("unchecked")
+        var latest = (java.util.Map<String, Object>) first.get("latestSync");
+        assertEquals("COMPLETED", latest.get("status"));
+        assertTrue(latest.containsKey("documentsWritten"));
+        assertTrue(latest.containsKey("triggeredBy"));
+        assertTrue(latest.containsKey("finishedAt"));
+        var hit = store.search("Retail Customer CoreBank SSN", 10).stream()
+                .filter(value -> value.type().equals("BUSINESS_ENTITY")).findFirst().orElseThrow();
+        assertEquals("METADATA_ONLY", hit.sensitivity());
+        assertFalse(hit.metadata().toString().toLowerCase().contains("password"));
+        long documentId = hit.id();
+
+        store.sync();
+        var replay = store.search("Retail Customer", 10).stream()
+                .filter(value -> value.type().equals("BUSINESS_ENTITY")).findFirst().orElseThrow();
+        assertEquals(documentId, replay.id());
+        assertEquals("FDS-" + documentId, replay.citation());
+    }
+
+    @Test
+    void userKnowledgeIsVersionedSeparatelyFromSystemRefresh() {
+        var added = store.addManualDocument("DOMAIN_RULE", "Dormant account",
+                "No customer initiated transaction for 365 days", new ObjectMapper().createObjectNode());
+        assertEquals("USER", added.origin());
+        store.sync();
+        assertTrue(store.search("Dormant account 365", 5).stream().anyMatch(value -> value.id() == added.id()));
+        store.removeDocument(added.id());
+        assertTrue(store.search("Dormant account 365", 5).isEmpty());
+    }
+
+    @Test
+    void manualKnowledgeAuditsCreateAndDeleteWithoutLeakingDocumentContent() {
+        var added = store.addManualDocument("DOMAIN_RULE", "Customer secrecy rule",
+                "Mask customer SSN 123-45-6789 and account 999888777 in every environment",
+                new ObjectMapper().createObjectNode().put("sample", "do-not-log-this"));
+
+        verify(audit).record(eq("system"), eq("FORGE_DATA_STORE_DOCUMENT_CREATED"), eq("AI"),
+                eq("forge-data-store-document"), eq(String.valueOf(added.id())), eq("Customer secrecy rule"),
+                eq("SUCCESS"), eq("Created Forge Data Store document"),
+                argThat(metadata -> metadata.contains("\"documentType\":\"DOMAIN_RULE\"")
+                        && metadata.contains("\"origin\":\"USER\"")
+                        && !metadata.contains("123-45-6789")
+                        && !metadata.contains("999888777")
+                        && !metadata.contains("do-not-log-this")));
+
+        store.removeDocument(added.id());
+
+        verify(audit).record(eq("system"), eq("FORGE_DATA_STORE_DOCUMENT_DELETED"), eq("AI"),
+                eq("forge-data-store-document"), eq(String.valueOf(added.id())), eq("Customer secrecy rule"),
+                eq("SUCCESS"), eq("Deleted Forge Data Store document"),
+                argThat(metadata -> metadata.contains("\"documentType\":\"DOMAIN_RULE\"")
+                        && metadata.contains("\"physicalDelete\":true")
+                        && !metadata.contains("123-45-6789")
+                        && !metadata.contains("999888777")));
+    }
+
+    @Test
+    void excludedSystemKnowledgeDoesNotReturnAfterRefresh() {
+        jdbc.update("INSERT INTO data_sources VALUES (1,'LegacyCore','DB2','SOURCE','UAT','banking')");
+        store.sync();
+        var document = store.search("LegacyCore", 5).stream().findFirst().orElseThrow();
+
+        store.removeDocument(document.id());
+        assertTrue(store.search("LegacyCore", 5).isEmpty());
+
+        store.sync();
+        assertTrue(store.search("LegacyCore", 5).isEmpty());
+        assertEquals(Boolean.TRUE, jdbc.queryForObject(
+                "SELECT excluded FROM forge_ai_documents WHERE id=?", Boolean.class, document.id()));
+    }
+
+    @Test
+    void syncAndSystemExclusionUseStructuredAudit() {
+        jdbc.update("INSERT INTO data_sources VALUES (1,'LegacyCore','DB2','SOURCE','UAT','banking')");
+
+        store.sync();
+        var document = store.search("LegacyCore", 5).stream().findFirst().orElseThrow();
+
+        verify(audit).record(eq("system"), eq("FORGE_DATA_STORE_SYNCED"), eq("AI"),
+                eq("forge-data-store-sync"), anyString(), eq("Forge Data Store"), eq("SUCCESS"),
+                eq("Forge Data Store synchronized"),
+                argThat(metadata -> metadata.contains("\"documentCount\"")
+                        && metadata.contains("\"sourceTypeCount\"")
+                        && !metadata.contains("LegacyCore")));
+
+        store.removeDocument(document.id());
+
+        verify(audit).record(eq("system"), eq("FORGE_DATA_STORE_DOCUMENT_EXCLUDED"), eq("AI"),
+                eq("forge-data-store-document"), eq(String.valueOf(document.id())), eq(document.title()),
+                eq("SUCCESS"), eq("Excluded Forge Data Store document"),
+                argThat(metadata -> metadata.contains("\"documentType\":\"DATA_SOURCE\"")
+                        && metadata.contains("\"origin\":\"SYSTEM\"")
+                        && metadata.contains("\"physicalDelete\":false")
+                        && !metadata.contains("LegacyCore")));
+    }
+
+    private void createMetadataTables() {
+        jdbc.execute("CREATE TABLE data_sources(id BIGINT,name VARCHAR(120),kind VARCHAR(40),role VARCHAR(40),environment VARCHAR(40),tags TEXT)");
+        jdbc.execute("CREATE TABLE dataset_definitions(id BIGINT,name VARCHAR(200),description TEXT,schema_name VARCHAR(200),driver_table VARCHAR(200),driver_filter TEXT,data_source_id BIGINT)");
+        jdbc.execute("CREATE TABLE table_profiles(dataset_id BIGINT,table_name VARCHAR(200),included BOOLEAN,filter_expr TEXT)");
+        jdbc.execute("CREATE TABLE masking_policies(id BIGINT,name VARCHAR(200),description TEXT)");
+        jdbc.execute("CREATE TABLE masking_rules(policy_id BIGINT,table_name VARCHAR(200),column_name VARCHAR(200),function VARCHAR(80),deterministic BOOLEAN)");
+        jdbc.execute("CREATE TABLE business_entities(id BIGINT,name VARCHAR(200),description TEXT,domain VARCHAR(120),primary_dataset_id BIGINT,root_table VARCHAR(200),business_key_columns TEXT,status VARCHAR(40),owner_username VARCHAR(120))");
+        jdbc.execute("CREATE TABLE business_entity_members(entity_id BIGINT,id BIGINT,system_name VARCHAR(200),data_source_id BIGINT,schema_name VARCHAR(200),dataset_id BIGINT,logical_role VARCHAR(120),table_name VARCHAR(200),key_columns TEXT,include_in_subset BOOLEAN,include_in_synthetic BOOLEAN,ordinal_no INT)");
+        jdbc.execute("CREATE TABLE classifications(data_source_id BIGINT,source_name VARCHAR(120),table_name VARCHAR(200),column_name VARCHAR(200),data_type VARCHAR(80),pii_type VARCHAR(80),confidence DOUBLE,suggested_function VARCHAR(80),status VARCHAR(40))");
+        jdbc.execute("CREATE TABLE mapping_definitions(id BIGINT,name VARCHAR(200),description TEXT)");
+        jdbc.execute("CREATE TABLE synthetic_saved_jobs(id VARCHAR(80),name VARCHAR(200),description TEXT,approval_status VARCHAR(40),owner_username VARCHAR(120),updated_at TIMESTAMP)");
+        jdbc.execute("CREATE TABLE datascope_saved_jobs(id VARCHAR(80),name VARCHAR(200),description TEXT,owner_username VARCHAR(120),updated_at TIMESTAMP)");
+        jdbc.execute("CREATE TABLE self_service_products(id VARCHAR(80),product_type VARCHAR(40),artifact_id VARCHAR(120),artifact_version INT,label VARCHAR(200),description TEXT,category VARCHAR(100),tags TEXT,approval_mode VARCHAR(40),allowed_environments TEXT,enabled BOOLEAN,updated_at TIMESTAMP)");
+    }
+}

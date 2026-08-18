@@ -1,0 +1,77 @@
+{
+  "operation" : "OPERATION_500TB_ROLLING_ENDURANCE",
+  "status" : "RUNNING",
+  "startedAt" : "2026-08-04T16:13:43.930627600Z",
+  "updatedAt" : "2026-08-04T16:44:22.688757500Z",
+  "plannedMinutes" : 90,
+  "reportIntervalMinutes" : 10,
+  "batchRows" : 100000,
+  "completedBatches" : 103,
+  "rowsPerEngine" : 10300000,
+  "rowsAcrossBothEngines" : 20600000,
+  "stagedBytesGenerated" : 773830748,
+  "peakHeapBytes" : 139159232,
+  "failures" : 0,
+  "windows" : [ {
+    "window" : 1,
+    "elapsedMinutes" : 10.1,
+    "rowsPerEngine" : 4100000,
+    "rowsAcrossBothEngines" : 8200000,
+    "stagedBytes" : 303513097,
+    "generationMillis" : 29046,
+    "postgresLoadMillis" : 122240,
+    "oracleLoadMillis" : 444613,
+    "reconciliationMillis" : 19017,
+    "rowsPerSecondAcrossBothEngines" : 13528,
+    "reconciliation" : {
+      "rows" : 4100000,
+      "idSum" : 8405002050000,
+      "amountSum" : 142885034850000
+    },
+    "peakHeapBytes" : 75319776,
+    "failures" : 0,
+    "status" : "PASS",
+    "recycleMillis" : 2999
+  }, {
+    "window" : 2,
+    "elapsedMinutes" : 20.19,
+    "rowsPerEngine" : 3900000,
+    "rowsAcrossBothEngines" : 7800000,
+    "stagedBytes" : 294617648,
+    "generationMillis" : 32997,
+    "postgresLoadMillis" : 130030,
+    "oracleLoadMillis" : 418112,
+    "reconciliationMillis" : 10679,
+    "rowsPerSecondAcrossBothEngines" : 12886,
+    "reconciliation" : {
+      "rows" : 3900000,
+      "idSum" : 23595001950000,
+      "amountSum" : 401115033150000
+    },
+    "peakHeapBytes" : 139159232,
+    "failures" : 0,
+    "status" : "PASS",
+    "recycleMillis" : 2043
+  }, {
+    "window" : 3,
+    "elapsedMinutes" : 30.32,
+    "rowsPerEngine" : 2300000,
+    "rowsAcrossBothEngines" : 4600000,
+    "stagedBytes" : 175700003,
+    "generationMillis" : 31490,
+    "postgresLoadMillis" : 143978,
+    "oracleLoadMillis" : 418934,
+    "reconciliationMillis" : 15077,
+    "rowsPerSecondAcrossBothEngines" : 7572,
+    "reconciliation" : {
+      "rows" : 2300000,
+      "idSum" : 21045001150000,
+      "amountSum" : 357765019550000
+    },
+    "peakHeapBytes" : 139159232,
+    "failures" : 0,
+    "status" : "PASS",
+    "recycleMillis" : 3928
+  } ],
+  "claimBoundary" : "Cumulative rolling physical load; not a simultaneously resident 500 TB database."
+}

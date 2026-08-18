@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: forgetdm-config
+  labels:
+    app.kubernetes.io/name: forgetdm
+    app.kubernetes.io/component: tdm-engine
+data:
+  # Non-secret runtime configuration (12-factor; every value maps to an application.yml env var).
+  FORGETDM_MANAGEMENT_PORT: "8090"
+  FORGETDM_DEPLOYMENT_MODE: "multi-tenant"
+
+  # External metadata database (point at your Postgres service / managed instance).
+  FORGETDM_DB_URL: "jdbc:postgresql://forgetdm-postgres:5432/forgetdm"
+
+  # Persistent, writable data root (mounted PVC); staging pool + file vault live here.
+  FORGETDM_FILE_VAULT_ROOT: "/data/vault"
+
+  # Zero-trust encrypted staging (RFP §3.1.2) — key derives from the (Vault-held) masking secret.
+  FORGETDM_STAGING_ENCRYPT: "true"
+
+  # Continuous CDC capture keeps slots current (RFP §3.1.1).
+  FORGETDM_CDC_CONTINUOUS_ENABLED: "true"
+  FORGETDM_CDC_INTERVAL_MS: "30000"
+
+  # HashiCorp Vault for masking-key custody (RFP §3.2.3). Token comes from the Secret.
+  FORGETDM_VAULT_ENABLED: "true"
+  FORGETDM_VAULT_ADDRESS: "http://vault.vault.svc:8200"
+  FORGETDM_VAULT_KV_MOUNT: "secret"
+  FORGETDM_VAULT_KV_VERSION: "2"
+  FORGETDM_VAULT_PATH: "forgetdm/masking"
+  FORGETDM_VAULT_FIELD: "maskingSecret"
+  FORGETDM_VAULT_FAIL_CLOSED: "true"

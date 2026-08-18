@@ -1,0 +1,35 @@
+{
+  "runId": "20260803-222202",
+  "verdict": "PASS_REAL_BTRFS_COW_500TB_LOGICAL",
+  "engine": "BTRFS",
+  "environment": "WSL2 file-backed isolated qualification pool",
+  "kernel": "6.18.33.2-microsoft-standard-WSL2",
+  "btrfsVersion": "btrfs-progs v6.6.3",
+  "backingDevice": "/dev/loop1",
+  "logicalBytes": 500000000000000,
+  "physicallyWrittenSampleMiB": 256,
+  "mutationMiB": 4,
+  "physicalPoolBytes": 17179869184,
+  "timingsMs": {
+    "sampleWrite": 22232,
+    "readOnlySnapshot": 91,
+    "writableClone": 71,
+    "cloneMutation": 694,
+    "rewind": 629
+  },
+  "exclusiveBytes": {
+    "sourceBeforeSnapshot": 0,
+    "cloneBeforeMutation": 268435456,
+    "cloneAfterMutation": 264241152
+  },
+  "assertions": {
+    "exact500TbLogicalNamespace": true,
+    "snapshotAndCloneAreMetadataOperations": true,
+    "cloneInitiallyMatchesSource": true,
+    "cloneMutationDoesNotChangeSource": true,
+    "rewindRestoresBaseline": true,
+    "dockerUsed": false,
+    "h2Used": false
+  },
+  "qualificationBoundary": "Proves real Btrfs COW snapshot, writable clone, isolation and rewind over an exact 500 TB sparse logical namespace. It does not claim 500 TB of physical data was loaded or application recovery was certified."
+}

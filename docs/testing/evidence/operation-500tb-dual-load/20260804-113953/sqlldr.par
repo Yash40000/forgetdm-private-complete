@@ -1,0 +1,7 @@
+control=D:\forgetdm - Copy\docs\testing\evidence\operation-500tb-dual-load\20260804-113953\sqlldr.ctl
+log=D:\forgetdm - Copy\docs\testing\evidence\operation-500tb-dual-load\20260804-113953\sqlldr.log
+bad=D:\forgetdm - Copy\docs\testing\evidence\operation-500tb-dual-load\20260804-113953\sqlldr.bad
+direct=true
+direct_path_lock_wait=true
+rows=50000
+errors=0

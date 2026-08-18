@@ -1,0 +1,18 @@
+{
+  "operation" : "OPERATION_500TB_CDC",
+  "generatedAt" : "2026-08-04T15:19:37.076454100Z",
+  "verdict" : "CDC_LOGICAL_CAPTURE_PASS_REAL_APPLY_SCALE_PENDING",
+  "baselineBytes" : "500000000000000",
+  "qualifiedDeltaPercent" : 1,
+  "deltaBytes" : "5000000000000",
+  "chunkBytes" : "67108864",
+  "chunks" : 74506,
+  "failureAfterChunks" : 25000,
+  "durableBytesBeforeFailure" : "1677721600000",
+  "replayedChunks" : 49506,
+  "duplicateChunks" : 0,
+  "boundedCapturePoll" : true,
+  "boundedApply" : false,
+  "applyScaleBlocker" : "CdcService.applyIncremental loads and nets the complete buffered change range in memory.",
+  "claimBoundary" : "This proves exact delta geometry and restart semantics, not physical 5 TB CDC throughput."
+}

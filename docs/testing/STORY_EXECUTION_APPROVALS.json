@@ -1,0 +1,261 @@
+{
+  "schemaVersion": 1,
+  "campaign": {
+    "name": "ForgeTDM product-readiness acceptance",
+    "authorizedBy": "Codex test coordinator, delegated by the product owner",
+    "authorizedAt": "2026-07-19T16:14:42-04:00",
+    "allowedScopes": [
+      "SOURCE_INSPECTION",
+      "UNIT_TEST",
+      "LOCAL_BROWSER",
+      "LOCAL_TEST_DATABASE",
+      "LOCAL_TEST_FIXTURE_MUTATION"
+    ],
+    "prohibitedScopes": [
+      "PRODUCTION",
+      "CUSTOMER_DATA",
+      "PAID_SERVICE",
+      "EXTERNAL_NOTIFICATION",
+      "UNSCOPED_DESTRUCTIVE_ACTION"
+    ],
+    "notes": "The product owner delegated story execution approval to the Codex test coordinator on 2026-07-19. Approval covers only ready-queue stories executed against local, non-production ForgeTDM fixtures. A separate explicit approval is required for every prohibited scope. Execution approval is not final acceptance; every green claim still requires independent evidence review."
+  },
+  "stories": {
+    "RBAC-001": {
+      "status": "APPROVED",
+      "approvedAt": "2026-07-19T16:14:42-04:00",
+      "approvedBy": "Codex test coordinator (product-owner delegated)",
+      "allowedScopes": [
+        "SOURCE_INSPECTION",
+        "UNIT_TEST",
+        "LOCAL_BROWSER",
+        "LOCAL_TEST_DATABASE",
+        "LOCAL_TEST_FIXTURE_MUTATION"
+      ],
+      "conditions": [
+        "Use synthetic test identities and artifacts only.",
+        "Do not contact external systems or paid services.",
+        "Do not test against production or customer data.",
+        "Retain sanitized evidence and independently review every green claim."
+      ]
+    },
+    "RBAC-002": {
+      "status": "APPROVED",
+      "approvedAt": "2026-07-20T00:00:00-04:00",
+      "approvedBy": "Codex test coordinator (product-owner delegated)",
+      "allowedScopes": [
+        "SOURCE_INSPECTION",
+        "UNIT_TEST",
+        "LOCAL_BROWSER",
+        "LOCAL_TEST_DATABASE",
+        "LOCAL_TEST_FIXTURE_MUTATION"
+      ],
+      "conditions": [
+        "Use synthetic ALPHA/BETA identities and artifacts only.",
+        "Do not contact external systems or paid services.",
+        "Do not test against production or customer data.",
+        "Retain sanitized evidence and independently review every green claim.",
+        "LEGAL-001 and LEGAL-002 remain deferred to a separate qualified legal review."
+      ]
+    },
+    "DISC-007": {
+      "status": "APPROVED",
+      "approvedAt": "2026-07-21T18:30:00-04:00",
+      "approvedBy": "Codex test coordinator (product-owner delegated)",
+      "allowedScopes": [
+        "SOURCE_INSPECTION",
+        "UNIT_TEST",
+        "LOCAL_BROWSER",
+        "LOCAL_TEST_DATABASE",
+        "LOCAL_TEST_FIXTURE_MUTATION"
+      ],
+      "conditions": [
+        "Use a namespaced disposable PostgreSQL discovery fixture only.",
+        "Do not contact external systems or paid services.",
+        "Do not test against production or customer data.",
+        "Retain sanitized evidence and independently review every green claim."
+      ]
+    },
+    "MASK-001": {
+      "status": "APPROVED",
+      "approvedAt": "2026-07-22T15:08:00-04:00",
+      "approvedBy": "Codex test coordinator (product-owner delegated)",
+      "allowedScopes": [
+        "SOURCE_INSPECTION",
+        "UNIT_TEST",
+        "REFERENCE_ENGINE"
+      ],
+      "conditions": [
+        "Use synthetic reference values only.",
+        "Do not contact external systems or paid services.",
+        "Execute every catalog function and retain a compact result summary."
+      ]
+    },
+    "MASK-002": {
+      "status": "APPROVED",
+      "approvedAt": "2026-07-22T16:30:00-04:00",
+      "approvedBy": "Codex test coordinator (product-owner delegated)",
+      "allowedScopes": [
+        "SOURCE_INSPECTION",
+        "UNIT_TEST",
+        "REFERENCE_ENGINE",
+        "LOCAL_TEST_DATABASE",
+        "LOCAL_TEST_FIXTURE_MUTATION"
+      ],
+      "conditions": [
+        "Use synthetic boundary values and disposable local database objects only.",
+        "Do not contact external systems or paid services.",
+        "Prove null, empty, Unicode, maximum-length, and JDBC datatype-fit behavior before marking green."
+      ]
+    },
+    "MASK-003": {
+      "status": "APPROVED",
+      "approvedAt": "2026-07-22T18:00:00-04:00",
+      "approvedBy": "Codex test coordinator (product-owner delegated)",
+      "allowedScopes": [
+        "SOURCE_INSPECTION",
+        "UNIT_TEST",
+        "REFERENCE_ENGINE",
+        "LOCAL_TEST_DATABASE",
+        "LOCAL_TEST_FIXTURE_MUTATION"
+      ],
+      "conditions": [
+        "Use synthetic reference values and local non-production connectors only.",
+        "Do not contact external systems or paid services.",
+        "Never retain database mutations or credentials in evidence.",
+        "Prove identical canonical checksums for equal seeds and changed checksums for different seeds."
+      ]
+    },
+    "MASK-004": {
+      "status": "APPROVED",
+      "approvedAt": "2026-07-22T19:15:00-04:00",
+      "approvedBy": "Codex test coordinator (product-owner delegated)",
+      "allowedScopes": [
+        "SOURCE_INSPECTION",
+        "UNIT_TEST",
+        "REFERENCE_ENGINE",
+        "LOCAL_TEST_DATABASE",
+        "LOCAL_TEST_FIXTURE_MUTATION"
+      ],
+      "conditions": [
+        "Use synthetic relationship keys and local non-production connectors only.",
+        "Use disposable objects or rollback-only transactions and remove every fixture.",
+        "Retain only join counts, checksums, test counts, and sanitized defect evidence.",
+        "Prove both positive consistency and negative separation before marking green."
+      ]
+    },
+    "MASK-005": {
+      "status": "APPROVED",
+      "approvedAt": "2026-07-22T18:40:00-04:00",
+      "approvedBy": "Codex test coordinator (product-owner delegated)",
+      "allowedScopes": [
+        "SOURCE_INSPECTION",
+        "UNIT_TEST",
+        "REFERENCE_ENGINE"
+      ],
+      "conditions": [
+        "Use synthetic names only.",
+        "Assert exact row-level composition and preserve independent null behavior.",
+        "Do not mark connector-specific behavior certified without direct connector evidence."
+      ]
+    },
+    "MASK-006": {
+      "status": "APPROVED",
+      "approvedAt": "2026-07-23T02:25:00-04:00",
+      "approvedBy": "Codex test coordinator (product-owner delegated)",
+      "allowedScopes": [
+        "SOURCE_INSPECTION",
+        "UNIT_TEST",
+        "REFERENCE_ENGINE"
+      ],
+      "conditions": [
+        "Use synthetic names only.",
+        "Assert exact independent values and incomplete-context behavior.",
+        "Preserve null, empty, formatting, and case contracts."
+      ]
+    },
+    "MASK-007": {
+      "status": "APPROVED",
+      "approvedAt": "2026-07-24T15:58:00-04:00",
+      "approvedBy": "Codex test coordinator (product-owner delegated)",
+      "allowedScopes": [
+        "SOURCE_INSPECTION",
+        "UNIT_TEST",
+        "REFERENCE_ENGINE"
+      ],
+      "conditions": [
+        "Use synthetic payment-card values only.",
+        "Prove Luhn validity, brand prefix/length contract, deterministic replay, capacity reporting, and collision-free behavior.",
+        "Do not contact external systems or paid services.",
+        "Retain compact evidence without real cardholder data."
+      ]
+    },
+    "MASK-008": {
+      "status": "APPROVED",
+      "approvedAt": "2026-07-24T16:24:00-04:00",
+      "approvedBy": "Codex test coordinator (product-owner delegated)",
+      "allowedScopes": [
+        "SOURCE_INSPECTION",
+        "UNIT_TEST",
+        "REFERENCE_ENGINE",
+        "LOCAL_TEST_DATABASE",
+        "LOCAL_TEST_FIXTURE_MUTATION"
+      ],
+      "conditions": [
+        "Use synthetic lookup values only.",
+        "Exercise inline lookup definitions and local relational lookup fixtures only.",
+        "Do not contact external systems or paid services.",
+        "Prove fail-closed behavior for missing keys, duplicate keys, malformed rows, and invalid fallback configuration."
+      ]
+    },
+    "MASK-009": {
+      "status": "APPROVED",
+      "approvedAt": "2026-07-24T16:32:00-04:00",
+      "approvedBy": "Codex test coordinator (product-owner delegated)",
+      "allowedScopes": [
+        "SOURCE_INSPECTION",
+        "UNIT_TEST",
+        "REFERENCE_ENGINE"
+      ],
+      "conditions": [
+        "Use synthetic address values only.",
+        "Prove every supported US state has address coverage and can be preserved.",
+        "Prove city, state, ZIP, street, and full-address outputs stay coherent for the same source.",
+        "Do not retain customer addresses or production geography data in evidence."
+      ]
+    },
+    "MASK-010": {
+      "status": "APPROVED",
+      "approvedAt": "2026-07-24T16:40:00-04:00",
+      "approvedBy": "Codex test coordinator (product-owner delegated)",
+      "allowedScopes": [
+        "SOURCE_INSPECTION",
+        "UNIT_TEST",
+        "REFERENCE_ENGINE"
+      ],
+      "conditions": [
+        "Use synthetic script samples only.",
+        "Prove Lua script masking cannot access file, OS, Java bridge, debug, package, or coroutine capabilities.",
+        "Prove script and helper mutations do not leak across executions.",
+        "Do not run untrusted external scripts, network calls, paid services, or production data."
+      ]
+    },
+    "DSRC-003": {
+      "status": "APPROVED",
+      "approvedAt": "2026-07-24T17:12:00-04:00",
+      "approvedBy": "Codex test coordinator (product-owner delegated)",
+      "allowedScopes": [
+        "SOURCE_INSPECTION",
+        "UNIT_TEST",
+        "LOCAL_TEST_DATABASE",
+        "LOCAL_TEST_FIXTURE_MUTATION"
+      ],
+      "conditions": [
+        "Use disposable local metadata fixtures only.",
+        "Do not contact external systems or paid services.",
+        "Do not test against production or customer data.",
+        "Retain sanitized metadata evidence and distinguish directly proven cases from HARD-PASS resource gates."
+      ]
+    }
+  }
+}

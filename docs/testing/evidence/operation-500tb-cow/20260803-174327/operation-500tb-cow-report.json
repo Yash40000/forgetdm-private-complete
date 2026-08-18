@@ -1,0 +1,46 @@
+{
+  "operation" : "OPERATION_500TB_REAL_COW",
+  "generatedAt" : "2026-08-03T21:46:06.628210400Z",
+  "commit" : "20d3102371e0",
+  "host" : "NOT_CONFIGURED",
+  "pool" : "tank/forgetdm",
+  "logicalBytes" : "500000000000000",
+  "sampleMiB" : 16,
+  "verdict" : "REAL_COW_TEST_BLOCKED_NO_ZFS_ENGINE",
+  "realCowProven" : false,
+  "dockerUsed" : false,
+  "h2Used" : false,
+  "physical500TbClaimAllowed" : false,
+  "reason" : "FORGETDM_ZFS_HOST is not configured; this Windows host has no local OpenZFS engine.",
+  "timeModel" : {
+    "onePercentDeltaBytes" : "5000000000000",
+    "cowSnapshot" : "Normally seconds to a few minutes after the baseline is synchronized; dataset size is not recopied.",
+    "initialBaselineRawTransfer" : {
+      "0.5 GB/s" : {
+        "hours" : 277.78,
+        "days" : 11.57
+      },
+      "1 GB/s" : {
+        "hours" : 138.89,
+        "days" : 5.79
+      },
+      "2 GB/s" : {
+        "hours" : 69.44,
+        "days" : 2.89
+      },
+      "5 GB/s" : {
+        "hours" : 27.78,
+        "days" : 1.16
+      },
+      "10 GB/s" : {
+        "hours" : 13.89,
+        "days" : 0.58
+      },
+      "20 GB/s" : {
+        "hours" : 6.94,
+        "days" : 0.29
+      }
+    },
+    "rewind" : "Normally seconds to minutes plus database crash recovery and validation."
+  }
+}

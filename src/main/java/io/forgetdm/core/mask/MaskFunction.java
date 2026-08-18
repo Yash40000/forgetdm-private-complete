@@ -1,0 +1,71 @@
+package io.forgetdm.core.mask;
+
+/**
+ * ForgeTDM masking function catalog — synthesis of format-preserving masking, referential-order load,
+ * convenience routines, and entity-consistent masking substitution. All functions are deterministic
+ * by default (same input + same project secret => same output) which guarantees referential integrity
+ * across tables, databases, and runs WITHOUT any shared cross-reference state.
+ */
+public enum MaskFunction {
+    FIRST_NAME,        // seedlist substitution (locale pack)
+    LAST_NAME,
+    FULL_NAME,         // composed masked first + last
+    EMAIL,             // rebuilt from masked name parts @ safe test domain (never deliverable)
+    PHONE,             // format preserving digits, keeps country/area shape
+    SSN,               // keeps area (first 3), regenerates rest; avoids invalid 000/666 groups
+    CREDIT_CARD,       // preserves BIN(6) + length, regenerates middle, repairs Luhn check digit
+    DATE_SHIFT,        // +- N days deterministic shift (param1 = max days, default 365); preserves format
+    DOB_AGE_BAND,      // random date keeping the same age band (param1 = band years, default 5)
+    ADDRESS_STREET,    // deterministic house number + street seedlist
+    ADDRESS_US,        // coherent US address, optional state preservation
+    CITY_STATE_ZIP,    // coherent triplet from cities_us.csv (semantic integrity)
+    COMPANY,
+    FORMAT_PRESERVE,   // digit->digit, letter->letter (case kept), punctuation untouched (FPE-style)
+    CHARACTER_MAP,     // whole-value character map; param1 = FIRST:2,LAST:4 preserve ranges
+    TOKENIZE,          // irreversible HMAC token; param1 = prefix, param2 = hex length (12..64)
+    SECURE_LOOKUP,     // cryptographic lookup; param1 = pipe values or seedlist file, param2 = output case
+    DIRECT_LOOKUP,     // exact source=>replacement pairs; supports governed @value-list references
+    HASH_LOOKUP,       // Optim-style source hash to sequential lookup row with trim/case/seed controls
+    REDACT,            // configurable redaction; param1 = mask char, param2 = FULL/KEEP_LAST4/etc.
+    REDACT_KEEP_LAST4, // ****1234
+    NUMERIC_NOISE,     // deterministic perturbation; param1 = PERCENT:10 or ABS:5, param2 = min:max clamp
+    MIN_MAX,           // deterministic value within param1=min and param2=max, preserving decimal scale
+    BANK_ACCOUNT,      // digit-safe account masker; param1 = KEEP_LAST4/FORMAT_PRESERVE/REDACT
+    IBAN,              // country/length-preserving, mod-97-valid IBAN
+    SWIFT_BIC,         // valid 8/11-character BIC with optional country preservation
+    ABA_ROUTING,       // valid 9-digit US ABA routing number with checksum
+    NATIONAL_ID,       // country-aware US/CA/UK national identifier; generic safe fallback
+    IP_ADDRESS,        // valid IPv4/IPv6 in non-routable test ranges
+    MAC_ADDRESS,       // valid locally administered unicast MAC
+    UUID,              // deterministic RFC-4122 version-4-shaped UUID
+    HASH_LOV,          // generic deterministic seedlist pick (param1 = seedlist name)
+    FIXED,             // constant (param1)
+    NULLIFY,
+    SEQUENCE,          // PREFIX + rowIndex (param1 = prefix)
+    PASSTHROUGH,
+    BY_INDICATOR,      // polymorphic column: dispatch per row on another column's value.
+                       // param1 = indicator column, param2 = map "P=PHONE|E=EMAIL|*=FORMAT_PRESERVE"
+    PARTIAL_MASK,      // mask only the parts matching a regex, keep the rest verbatim ("yash1234" -> "kim1234").
+                       // param1 = regex of what to mask (default [A-Za-z]+), param2 = function per match (default FIRST_NAME)
+
+    // ---- split fields: one logical value spread across several physical columns. Each column's rule
+    //      composes the full value from its siblings, masks it ONCE (canonical salt), and emits only its
+    //      own slice — so all parts of a row stay mutually coherent and match a combined column elsewhere.
+    PHONE_SPLIT,       // param1 = THIS column's name, param2 = ordered sibling columns, e.g. "area_code,exchange,line_no"
+    SSN_SPLIT,         // param1 = THIS column's name, param2 = ordered sibling columns, e.g. "ssn_area,ssn_group,ssn_serial"
+    DATE_SPLIT,        // param1 = THIS column's name, param2 = role map "dd=dob_day,mm=dob_month,yyyy=dob_year" (age-band preserved)
+
+    AGE,               // IBM-Optim-style date aging: shift every date by a FIXED amount so relative gaps are
+                       // preserved (unlike DATE_SHIFT's per-value pseudo-random shift). param1 = shift spec
+                       // "+1y -2m +3w +10d" (no sign = plus); param2 = date format (blank = auto-detect)
+
+    SCRIPT,            // user-defined Lua (Optim-style exit) for anything not covered out of the box.
+                       // param1 = script name from the Masking Scripts registry, param2 = extra arg exposed
+                       // to the script as "param". Sandboxed (no os/io/files); deterministic helpers via forge.*
+
+    SWIFT_MT           // structure-preserving masker for SWIFT MT (FIN) messages stored in a column/blob.
+                       // Parses the {1:}{2:}{4:...} block structure and masks BICs, account numbers, party
+                       // names and references in place — deterministically (BIC->valid BIC, account keeps
+                       // length, name->name) — then repacks so the message still validates. Amounts, dates
+                       // and currencies are left intact so the message stays financially coherent.
+}

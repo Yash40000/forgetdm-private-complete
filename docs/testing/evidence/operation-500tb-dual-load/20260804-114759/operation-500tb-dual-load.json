@@ -1,0 +1,31 @@
+{
+  "operation" : "OPERATION_500TB_DUAL_ENGINE_LOAD",
+  "generatedAt" : "2026-08-04T15:50:23.318083300Z",
+  "verdict" : "REAL_BOUNDED_NATIVE_LOAD_PASS_500TB_PHYSICAL_PENDING",
+  "logicalBytesPerEngine" : "500000000000000",
+  "restartChunkBytes" : "268435456",
+  "restartChunksPerEngine" : 1862646,
+  "sampleRowsPerEngine" : 100000,
+  "sampleFileBytes" : 2812434,
+  "postgres" : {
+    "proof" : {
+      "idSum" : 5000050000,
+      "amountSum" : 85000850000,
+      "rows" : 100000
+    },
+    "elapsedMillis" : 1753,
+    "strategy" : "POSTGRES_COPY",
+    "nativeUsed" : true
+  },
+  "oracle" : {
+    "proof" : {
+      "idSum" : 5000050000,
+      "amountSum" : 85000850000,
+      "rows" : 100000
+    },
+    "elapsedMillis" : 11433,
+    "strategy" : "ORACLE_SQLLOADER_DIRECT_PATH",
+    "nativeUsed" : true
+  },
+  "claimBoundary" : "Real native loaders were measured on a bounded sample; 500 TB was planned, not physically stored or loaded on this workstation."
+}

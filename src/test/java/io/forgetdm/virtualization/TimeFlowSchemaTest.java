@@ -1,0 +1,105 @@
+package io.forgetdm.virtualization;
+
+import io.forgetdm.datasource.DataSourceService;
+import io.forgetdm.datasource.SqlDialect;
+import org.junit.jupiter.api.Test;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.Types;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class TimeFlowSchemaTest {
+
+    @Test
+    void db2StyleSchemaIsCanonicalizedAndMaterializedOutsidePublic() throws Exception {
+        try (Connection c = DriverManager.getConnection(
+                "jdbc:h2:mem:timeflow-schema;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE", "sa", "")) {
+            c.createStatement().execute("CREATE SCHEMA \"OMD1\"");
+            assertEquals("OMD1", DataSourceService.normalizeSchema(c, "omd1"));
+
+            SnapshotManifest.TableManifest table = table("CUSTOMERS", "CUSTOMER_ID");
+            SnapshotManifest manifest = new SnapshotManifest(1, "omd1", List.of(table), List.of());
+
+            new TimeFlowEngine(new ChunkStore()).materialize(c, SqlDialect.H2, manifest);
+
+            assertTrue(tableExists(c, "OMD1", "CUSTOMERS"));
+            assertFalse(tableExists(c, "public", "CUSTOMERS"));
+        }
+    }
+
+    @Test
+    void materializeCreatesMissingCapturedSchema() throws Exception {
+        try (Connection c = DriverManager.getConnection(
+                "jdbc:h2:mem:timeflow-create-schema;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE", "sa", "")) {
+            SnapshotManifest.TableManifest table = table("ACCOUNTS", "ACCOUNT_ID");
+            SnapshotManifest manifest = new SnapshotManifest(1, "OMD1", List.of(table), List.of());
+
+            new TimeFlowEngine(new ChunkStore()).materialize(c, SqlDialect.H2, manifest);
+
+            assertTrue(tableExists(c, "OMD1", "ACCOUNTS"));
+            assertFalse(tableExists(c, "public", "ACCOUNTS"));
+        }
+    }
+
+    @Test
+    void quotedDefaultSchemaSurvivesLowerCaseH2ModeWhenVdbIsReopened() throws Exception {
+        String baseUrl = "jdbc:h2:mem:timeflow-reopen-schema;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1";
+        SnapshotManifest manifest = new SnapshotManifest(1, "OMD1", List.of(table("ACCOUNTS", "ACCOUNT_ID")), List.of());
+
+        try (Connection c = DriverManager.getConnection(baseUrl, "sa", "")) {
+            new TimeFlowEngine(new ChunkStore()).materialize(c, SqlDialect.H2, manifest);
+        }
+        try (Connection reopened = DriverManager.getConnection(baseUrl + ";INIT=SET SCHEMA \"OMD1\"", "sa", "")) {
+            assertEquals("OMD1", reopened.getSchema());
+            assertTrue(tableExists(reopened, "OMD1", "ACCOUNTS"));
+        }
+    }
+
+    @Test
+    void rematerializeReplacesTablesWithCircularForeignKeys() throws Exception {
+        try (Connection c = DriverManager.getConnection(
+                "jdbc:h2:mem:timeflow-circular-replace;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE", "sa", "")) {
+            SnapshotManifest.TableManifest customers = new SnapshotManifest.TableManifest(
+                    "CUSTOMERS",
+                    List.of(
+                            new SnapshotManifest.ColumnInfo("CUSTOMER_ID", Types.BIGINT, "BIGINT", 19, 0, false),
+                            new SnapshotManifest.ColumnInfo("PRIMARY_ACCOUNT_ID", Types.BIGINT, "BIGINT", 19, 0, true)),
+                    List.of("CUSTOMER_ID"), 0, List.of());
+            SnapshotManifest.TableManifest accounts = new SnapshotManifest.TableManifest(
+                    "ACCOUNTS",
+                    List.of(
+                            new SnapshotManifest.ColumnInfo("ACCOUNT_ID", Types.BIGINT, "BIGINT", 19, 0, false),
+                            new SnapshotManifest.ColumnInfo("CUSTOMER_ID", Types.BIGINT, "BIGINT", 19, 0, true)),
+                    List.of("ACCOUNT_ID"), 0, List.of());
+            SnapshotManifest manifest = new SnapshotManifest(1, "BANKING", List.of(customers, accounts), List.of(
+                    new SnapshotManifest.FkInfo("CUSTOMERS", List.of("PRIMARY_ACCOUNT_ID"), "ACCOUNTS", List.of("ACCOUNT_ID")),
+                    new SnapshotManifest.FkInfo("ACCOUNTS", List.of("CUSTOMER_ID"), "CUSTOMERS", List.of("CUSTOMER_ID"))));
+
+            TimeFlowEngine engine = new TimeFlowEngine(new ChunkStore());
+            engine.materialize(c, SqlDialect.H2, manifest);
+            engine.materialize(c, SqlDialect.H2, manifest);
+
+            assertTrue(tableExists(c, "BANKING", "CUSTOMERS"));
+            assertTrue(tableExists(c, "BANKING", "ACCOUNTS"));
+        }
+    }
+
+    private static SnapshotManifest.TableManifest table(String table, String id) {
+        return new SnapshotManifest.TableManifest(
+                table,
+                List.of(new SnapshotManifest.ColumnInfo(id, Types.BIGINT, "BIGINT", 19, 0, false)),
+                List.of(id), 0, List.of());
+    }
+
+    private static boolean tableExists(Connection c, String schema, String table) throws Exception {
+        try (ResultSet rs = c.getMetaData().getTables(null, schema, table, new String[]{"TABLE"})) {
+            return rs.next();
+        }
+    }
+}

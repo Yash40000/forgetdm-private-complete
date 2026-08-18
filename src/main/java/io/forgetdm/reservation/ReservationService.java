@@ -1,0 +1,172 @@
+package io.forgetdm.reservation;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.forgetdm.audit.AuditService;
+import io.forgetdm.common.ApiException;
+import io.forgetdm.datasource.ConnectionFactory;
+import io.forgetdm.datasource.DataSourceEntity;
+import io.forgetdm.datasource.DataSourceService;
+import io.forgetdm.security.AccessContext;
+import io.forgetdm.subset.SubsetService;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
+
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.Statement;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.*;
+
+/**
+ * Find & Reserve: a tester asks for rows matching criteria; ForgeTDM finds rows
+ * NOT already reserved by anyone else, locks them with a TTL, and returns the keys.
+ * Prevents two test streams consuming/mutating the same records.
+ */
+@Service
+public class ReservationService {
+
+    private final ReservationRepository repo;
+    private final DataSourceService dataSources;
+    private final ConnectionFactory connections;
+    private final SubsetService subsets;
+    private final AuditService audit;
+    private final ObjectMapper json = new ObjectMapper();
+
+    private final io.forgetdm.security.OwnershipGuard ownership;
+
+    public ReservationService(ReservationRepository repo, DataSourceService dataSources,
+                              ConnectionFactory connections, SubsetService subsets, AuditService audit,
+                              io.forgetdm.security.OwnershipGuard ownership) {
+        this.repo = repo; this.dataSources = dataSources; this.connections = connections;
+        this.subsets = subsets; this.audit = audit; this.ownership = ownership;
+    }
+
+    public synchronized ReservationEntity findAndReserve(Long dsId, String table, String criteria,
+                                                         int count, String reservedBy, String purpose, int ttlHours) {
+        SubsetService.guardFilter(criteria);
+        DataSourceEntity ds = dataSources.get(dsId);
+
+        Set<String> alreadyReserved = activeKeys(dsId, table);
+        List<String> picked = new ArrayList<>();
+        try (Connection c = connections.open(ds)) {
+            String pk = subsets.primaryKey(c, table);
+            String sql = "SELECT " + q(pk) + " FROM " + q(table)
+                    + (criteria == null || criteria.isBlank() ? "" : " WHERE " + criteria);
+            try (Statement st = c.createStatement()) {
+                st.setMaxRows(Math.max(count * 5, 500)); // overscan, then skip conflicts
+                try (ResultSet rs = st.executeQuery(sql)) {
+                    while (rs.next() && picked.size() < count) {
+                        String key = rs.getString(1);
+                        if (key != null && !alreadyReserved.contains(key)) picked.add(key);
+                    }
+                }
+            }
+        } catch (ApiException e) { throw e; }
+        catch (Exception e) { throw ApiException.bad("Find & reserve failed: " + e.getMessage()); }
+
+        if (picked.size() < count)
+            throw ApiException.conflict("Only " + picked.size() + " unreserved rows match — "
+                    + (count - picked.size()) + " short. Release stale reservations or widen criteria.");
+
+        ReservationEntity r = new ReservationEntity();
+        r.setDataSourceId(dsId);
+        r.setTableName(table);
+        r.setCriteria(criteria);
+        r.setReservedBy(reservedBy == null ? "anonymous" : reservedBy);
+        r.setPurpose(purpose);
+        r.setExpiresAt(Instant.now().plus(Math.max(1, ttlHours), ChronoUnit.HOURS));
+        r.setOwnerUserId(ownership.defaultOwnerUserId());
+        r.setOwnerGroupId(ownership.defaultOwnerGroupId());
+        if (r.getVisibility() == null || r.getVisibility().isBlank()) {
+            r.setVisibility(ownership.defaultVisibility());
+        }
+        try { r.setRowKeysJson(json.writeValueAsString(picked)); }
+        catch (Exception e) { throw new IllegalStateException(e); }
+        ReservationEntity saved = repo.save(r);
+        audit.record(auditActor(r.getReservedBy()), "DATA_RESERVED", "RESERVE", "RESERVATION",
+                String.valueOf(saved.getId()), safeName(table), "SUCCESS",
+                "Reserved " + picked.size() + " rows from " + safeName(table), reservationMetadata(saved, picked.size(), ttlHours, "ACTIVE"));
+        return saved;
+    }
+
+    public Set<String> activeKeys(Long dsId, String table) {
+        Set<String> keys = new HashSet<>();
+        for (ReservationEntity r : repo.findByDataSourceIdAndTableNameAndStatus(dsId, table, "ACTIVE")) {
+            if (r.getExpiresAt().isBefore(Instant.now())) continue;
+            keys.addAll(parseKeys(r.getRowKeysJson()));
+        }
+        return keys;
+    }
+
+    public ReservationEntity release(Long id) {
+        ReservationEntity r = repo.findById(id).orElseThrow(() -> ApiException.notFound("Reservation " + id + " not found"));
+        // Releasing another group's reservation would free their test data underneath them.
+        ownership.assertCanSee("reservation", id, r.getOwnerUserId(), r.getOwnerGroupId(), r.getVisibility());
+        String previousStatus = r.getStatus();
+        r.setStatus("RELEASED");
+        ReservationEntity saved = repo.save(r);
+        audit.record(auditActor(r.getReservedBy()), "DATA_RELEASED", "RESERVE", "RESERVATION",
+                String.valueOf(saved.getId()), safeName(saved.getTableName()), "SUCCESS",
+                "Released reservation " + saved.getId(), reservationMetadata(saved, parseKeys(saved.getRowKeysJson()).size(), null, previousStatus));
+        return saved;
+    }
+
+    /** Tenant-scoped: only reservations the caller owns, their group owns, or that are SHARED. */
+    public List<ReservationEntity> list() {
+        List<ReservationEntity> all = new java.util.ArrayList<>(repo.findAll().stream()
+                .filter(r -> ownership.canSee(r.getOwnerUserId(), r.getOwnerGroupId(), r.getVisibility()))
+                .toList());
+        all.sort(Comparator.comparing(ReservationEntity::getId).reversed());
+        return all;
+    }
+
+    @Scheduled(fixedDelay = 60_000)
+    public void expireStale() {
+        for (ReservationEntity r : repo.findByStatus("ACTIVE")) {
+            if (r.getExpiresAt().isBefore(Instant.now())) { r.setStatus("EXPIRED"); repo.save(r); }
+        }
+    }
+
+    private List<String> parseKeys(String jsonStr) {
+        try { return json.readValue(jsonStr, new TypeReference<List<String>>() {}); }
+        catch (Exception e) { return List.of(); }
+    }
+
+    private String reservationMetadata(ReservationEntity r, int reservedCount, Integer ttlHours, String previousStatus) {
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("reservationId", r.getId());
+        metadata.put("dataSourceId", r.getDataSourceId());
+        metadata.put("tableName", safeName(r.getTableName()));
+        metadata.put("reservedCount", Math.max(0, reservedCount));
+        metadata.put("status", r.getStatus());
+        if (previousStatus != null) metadata.put("previousStatus", previousStatus);
+        if (ttlHours != null) metadata.put("ttlHours", Math.max(1, ttlHours));
+        if (r.getExpiresAt() != null) metadata.put("expiresAt", r.getExpiresAt().toString());
+        metadata.put("criteriaProvided", r.getCriteria() != null && !r.getCriteria().isBlank());
+        metadata.put("purposeLength", r.getPurpose() == null ? 0 : r.getPurpose().length());
+        metadata.put("ownerUserId", r.getOwnerUserId());
+        metadata.put("ownerGroupId", r.getOwnerGroupId());
+        metadata.put("visibility", r.getVisibility());
+        return toJson(metadata);
+    }
+
+    private String toJson(Map<String, Object> metadata) {
+        try { return json.writeValueAsString(metadata); }
+        catch (Exception e) { return "{}"; }
+    }
+
+    private static String auditActor(String fallback) {
+        return AccessContext.current().map(p -> p.username()).orElse(fallback == null || fallback.isBlank() ? "system" : fallback);
+    }
+
+    private static String safeName(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private static String q(String ident) {
+        if (!ident.matches("[A-Za-z0-9_]+")) throw ApiException.bad("Illegal identifier: " + ident);
+        return "\"" + ident + "\"";
+    }
+}

@@ -1,0 +1,79 @@
+﻿{
+    "operation":  "OPERATION_500TB_SYNTHETIC",
+    "generatedAt":  "2026-08-03T21:24:34.225881500Z",
+    "commit":  "20d3102371e0",
+    "verdict":  "SYNTHETIC_LOGICAL_SCALE_PASS_PHYSICAL_CERTIFICATION_PENDING",
+    "physical500TbClaimAllowed":  false,
+    "claimBoundary":  "The harness plans 500 TB and streams a bounded deterministic sample; it does not write 500 TB to a database or file receiver.",
+    "logicalDataset":  {
+                           "totalRows":  "500000000000",
+                           "averageRowBytes":  1000,
+                           "dbRowLimitPerTable":  100000000,
+                           "families":  [
+                                            "CUSTOMER",
+                                            "ACCOUNT",
+                                            "CARD",
+                                            "TRANSACTION",
+                                            "AUDIT"
+                                        ],
+                           "tables":  5000,
+                           "bytes":  "500000000000000",
+                           "shards":  1000,
+                           "decimalTb":  500,
+                           "rowsPerTable":  100000000
+                       },
+    "partitioning":  {
+                         "descriptorBytes":  40,
+                         "manifestSha256":  "ef679571c79c85b8c9dc525757a44af74a29e8f02086a73535f0868c2b164bd6",
+                         "coveredRows":  "500000000000",
+                         "workers":  32,
+                         "maxResidentRanges":  32,
+                         "partitions":  160000
+                     },
+    "deterministicReplay":  {
+                                "differentSeedProducesDifferentOutput":  true,
+                                "fkChecks":  3000000,
+                                "receiverIndependent":  true,
+                                "sampleRows":  1000000,
+                                "workingRecordBufferBytes":  48,
+                                "sha256":  "9f2d64ac1c18ae497f496ad99b296190ec341488ad303410edd44f98d559b24a",
+                                "singleEqualsPartitioned":  true
+                            },
+    "relationships":  {
+                          "parentIndexCap":  200000,
+                          "validity":  "EXACT: every sampled child key exists in the retained parent-key domain",
+                          "distribution":  "APPROXIMATE beyond the bounded parent index cap",
+                          "dependencyWaves":  4
+                      },
+    "uniqueness":  {
+                       "configuredBins":  1000,
+                       "primaryKey":  "Injective BIGINT row sequence within every table",
+                       "cardRows":  "100000000000",
+                       "capacityPass":  true,
+                       "panCapacity":  "1000000000000"
+                   },
+    "restart":  {
+                    "replayedPartitions":  80000,
+                    "checkpointBytes":  156,
+                    "finalCommittedPartitions":  160000,
+                    "coveredRows":  "500000000000",
+                    "duplicatePartitions":  0,
+                    "committedBeforeFailure":  80000
+                },
+    "receiverBackpressure":  {
+                                 "queueCapacity":  8,
+                                 "batches":  10000,
+                                 "droppedBatches":  0,
+                                 "maxQueueDepth":  8,
+                                 "blockedOffers":  9990
+                             },
+    "requiredNextGate":  "Run 1%, 10%, 1 TB, 5 TB, then 500 TB on production-equivalent targets with actual generators, LOB mix, constraints, native loaders, telemetry, cancellation, restart, and reconciliation.",
+    "focusedRegression":  {
+                              "status":  "PASS",
+                              "testClasses":  8,
+                              "tests":  31,
+                              "failures":  0,
+                              "errors":  0,
+                              "skipped":  0
+                          }
+}

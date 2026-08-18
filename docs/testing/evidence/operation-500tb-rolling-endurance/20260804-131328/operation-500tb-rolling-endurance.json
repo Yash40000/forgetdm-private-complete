@@ -1,0 +1,117 @@
+{
+  "operation" : "OPERATION_500TB_ROLLING_ENDURANCE",
+  "status" : "RUNNING",
+  "startedAt" : "2026-08-04T17:14:15.516657400Z",
+  "updatedAt" : "2026-08-04T18:05:50.249934900Z",
+  "plannedMinutes" : 60,
+  "reportIntervalMinutes" : 10,
+  "batchRows" : 100000,
+  "completedBatches" : 209,
+  "rowsPerEngine" : 20900000,
+  "rowsAcrossBothEngines" : 41800000,
+  "stagedBytesGenerated" : 1611230748,
+  "peakHeapBytes" : 93699464,
+  "failures" : 0,
+  "windows" : [ {
+    "window" : 1,
+    "elapsedMinutes" : 10.12,
+    "rowsPerEngine" : 4400000,
+    "rowsAcrossBothEngines" : 8800000,
+    "stagedBytes" : 326013097,
+    "generationMillis" : 13965,
+    "postgresLoadMillis" : 80624,
+    "oracleLoadMillis" : 503844,
+    "reconciliationMillis" : 15664,
+    "rowsPerSecondAcrossBothEngines" : 14488,
+    "reconciliation" : {
+      "rows" : 4400000,
+      "amountSum" : 164560037400000,
+      "idSum" : 9680002200000
+    },
+    "peakHeapBytes" : 67412336,
+    "failures" : 0,
+    "status" : "PASS",
+    "recycleMillis" : 1633
+  }, {
+    "window" : 2,
+    "elapsedMinutes" : 20.36,
+    "rowsPerEngine" : 5100000,
+    "rowsAcrossBothEngines" : 10200000,
+    "stagedBytes" : 386117648,
+    "generationMillis" : 24287,
+    "postgresLoadMillis" : 109078,
+    "oracleLoadMillis" : 462114,
+    "reconciliationMillis" : 8433,
+    "rowsPerSecondAcrossBothEngines" : 16599,
+    "reconciliation" : {
+      "rows" : 5100000,
+      "amountSum" : 602565043350000,
+      "idSum" : 35445002550000
+    },
+    "peakHeapBytes" : 91497048,
+    "failures" : 0,
+    "status" : "PASS",
+    "recycleMillis" : 1120
+  }, {
+    "window" : 3,
+    "elapsedMinutes" : 30.57,
+    "rowsPerEngine" : 5100000,
+    "rowsAcrossBothEngines" : 10200000,
+    "stagedBytes" : 401400003,
+    "generationMillis" : 22734,
+    "postgresLoadMillis" : 123077,
+    "oracleLoadMillis" : 456719,
+    "reconciliationMillis" : 10229,
+    "rowsPerSecondAcrossBothEngines" : 16655,
+    "reconciliation" : {
+      "rows" : 5100000,
+      "amountSum" : 1044735043350000,
+      "idSum" : 61455002550000
+    },
+    "peakHeapBytes" : 93662312,
+    "failures" : 0,
+    "status" : "PASS",
+    "recycleMillis" : 2075
+  }, {
+    "window" : 4,
+    "elapsedMinutes" : 40.85,
+    "rowsPerEngine" : 3500000,
+    "rowsAcrossBothEngines" : 7000000,
+    "stagedBytes" : 276500000,
+    "generationMillis" : 22455,
+    "postgresLoadMillis" : 119463,
+    "oracleLoadMillis" : 461449,
+    "reconciliationMillis" : 17549,
+    "rowsPerSecondAcrossBothEngines" : 11356,
+    "reconciliation" : {
+      "rows" : 3500000,
+      "amountSum" : 972825029750000,
+      "idSum" : 57225001750000
+    },
+    "peakHeapBytes" : 93699464,
+    "failures" : 0,
+    "status" : "PASS",
+    "recycleMillis" : 3234
+  }, {
+    "window" : 5,
+    "elapsedMinutes" : 51.07,
+    "rowsPerEngine" : 2800000,
+    "rowsAcrossBothEngines" : 5600000,
+    "stagedBytes" : 221200000,
+    "generationMillis" : 28027,
+    "postgresLoadMillis" : 140191,
+    "oracleLoadMillis" : 423391,
+    "reconciliationMillis" : 20537,
+    "rowsPerSecondAcrossBothEngines" : 9125,
+    "reconciliation" : {
+      "rows" : 2800000,
+      "amountSum" : 928200023800000,
+      "idSum" : 54600001400000
+    },
+    "peakHeapBytes" : 93699464,
+    "failures" : 0,
+    "status" : "PASS",
+    "recycleMillis" : 5685
+  } ],
+  "claimBoundary" : "Cumulative rolling physical load; not a simultaneously resident 500 TB database."
+}

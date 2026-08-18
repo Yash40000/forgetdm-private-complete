@@ -1,0 +1,21 @@
+﻿{
+    "schemaVersion":  1,
+    "storyId":  "DSRC-003",
+    "decision":  "APPROVED",
+    "checkedAt":  "2026-07-24T17:13:04.0739139-04:00",
+    "approvalRecordedAt":  "2026-07-24T17:12:00-04:00",
+    "approvedBy":  "Codex test coordinator (product-owner delegated)",
+    "requestedScopes":  [
+                            "SOURCE_INSPECTION",
+                            "UNIT_TEST",
+                            "LOCAL_TEST_DATABASE",
+                            "LOCAL_TEST_FIXTURE_MUTATION"
+                        ],
+    "storySpecification":  "D:\\forgetdm - Copy\\docs\\testing\\cases\\ready\\DSRC-003.md",
+    "conditions":  [
+                       "Use disposable local metadata fixtures only.",
+                       "Do not contact external systems or paid services.",
+                       "Do not test against production or customer data.",
+                       "Retain sanitized metadata evidence and distinguish directly proven cases from HARD-PASS resource gates."
+                   ]
+}

@@ -1,0 +1,392 @@
+'use client';
+
+import { useState } from 'react';
+import {
+  ActionIcon,
+  Badge,
+  Button,
+  Checkbox,
+  Group,
+  Modal,
+  ScrollArea,
+  Select,
+  SimpleGrid,
+  Stack,
+  Table,
+  Text,
+  Textarea,
+  TextInput,
+  Tooltip
+} from '@mantine/core';
+import { notifications } from '@mantine/notifications';
+import { IconCopy, IconDatabaseImport, IconEdit, IconPlus, IconTrash } from '@tabler/icons-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+
+import { useConfirm } from '@/components/confirm';
+import { NameInput } from '@/components/name-input';
+import { QueryErrorBanner } from '@/components/query-error-banner';
+import { apiFetch, apiPost } from '@/lib/api';
+import { keys } from '@/lib/keys';
+import type { DataSource } from '@/lib/types';
+import { usePermissions } from '@/lib/use-permissions';
+import { fetchColumns, schemaOptions, sourceOptions, tableOptions, useSchemas, useTables } from '../hooks';
+import type { SyntheticValueList } from '../types';
+import { technicalInputProps } from '../utils';
+
+type EditorDraft = {
+  name: string;
+  description: string;
+  systemTag: string;
+  listValues: string;
+  visibility: string;
+};
+
+const EMPTY_EDITOR: EditorDraft = {
+  name: '',
+  description: '',
+  systemTag: '',
+  listValues: '',
+  visibility: 'GLOBAL'
+};
+
+export function ValueListsPanel({ lists, dataSources }: { lists: SyntheticValueList[]; dataSources: DataSource[] }) {
+  const queryClient = useQueryClient();
+  const { confirm, confirmElement } = useConfirm();
+  const { can } = usePermissions();
+  const canManage = can('synthetic.manage');
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [draft, setDraft] = useState<EditorDraft>(EMPTY_EDITOR);
+  const [editorOpened, setEditorOpened] = useState(false);
+  const [importOpened, setImportOpened] = useState(false);
+  const [importDraft, setImportDraft] = useState({
+    dataSourceId: '',
+    schema: '',
+    table: '',
+    column: '',
+    name: '',
+    description: '',
+    systemTag: '',
+    visibility: 'GLOBAL',
+    weighted: false
+  });
+
+  const importSourceId = importDraft.dataSourceId ? Number(importDraft.dataSourceId) : null;
+  const schemasQuery = useSchemas(importSourceId);
+  const tablesQuery = useTables(importSourceId, importDraft.schema);
+  const columnsQuery = useQuery({
+    queryKey: keys.dataSources.columns(importSourceId, importDraft.table, importDraft.schema),
+    enabled: Boolean(importSourceId && importDraft.table.trim()),
+    queryFn: () => fetchColumns(importSourceId!, importDraft.schema, importDraft.table.trim())
+  });
+
+  const refresh = () => queryClient.invalidateQueries({ queryKey: keys.synthetic.valueLists });
+
+  const saveMutation = useMutation({
+    mutationFn: () => {
+      if (!canManage) throw new Error('You do not have permission to manage synthetic reference lists.');
+      if (!draft.name.trim()) throw new Error('Enter a stable lower-case reference name.');
+      if (!draft.listValues.trim()) throw new Error('Enter at least one value. Use | between values.');
+      return apiPost<SyntheticValueList>('/api/synthetic/value-lists', {
+        name: draft.name.trim(),
+        description: draft.description.trim() || null,
+        systemTag: draft.systemTag.trim() || null,
+        listValues: draft.listValues.trim(),
+        visibility: draft.visibility
+      });
+    },
+    onSuccess: async (saved) => {
+      notifications.show({ color: 'green', title: 'Reference list saved', message: `Use @${saved.name} in generators or lookup masking functions.` });
+      setEditingId(null);
+      setDraft(EMPTY_EDITOR);
+      setEditorOpened(false);
+      await refresh();
+    },
+    onError: (error) => notifications.show({ color: 'red', title: 'Could not save reference list', message: error.message })
+  });
+
+  const importMutation = useMutation({
+    mutationFn: () => {
+      if (!canManage) throw new Error('You do not have permission to import synthetic reference lists.');
+      if (!importSourceId) throw new Error('Choose the source database.');
+      if (!importDraft.table.trim() || !importDraft.column.trim()) throw new Error('Table and column are required.');
+      return apiPost<SyntheticValueList>('/api/synthetic/value-lists/import', {
+        dataSourceId: importSourceId,
+        schema: importDraft.schema.trim() || null,
+        table: importDraft.table.trim(),
+        column: importDraft.column.trim(),
+        name: importDraft.name.trim() || null,
+        description: importDraft.description.trim() || null,
+        systemTag: importDraft.systemTag.trim() || null,
+        weighted: importDraft.weighted,
+        visibility: importDraft.visibility
+      });
+    },
+    onSuccess: async (saved) => {
+      notifications.show({ color: 'green', title: 'Live values imported', message: `@${saved.name} now has ${valueCount(saved.listValues)} values.` });
+      setImportDraft((current) => ({ ...current, name: '', description: '', table: '', column: '' }));
+      setImportOpened(false);
+      await refresh();
+    },
+    onError: (error) => notifications.show({ color: 'red', title: 'Could not import values', message: error.message })
+  });
+
+  const editList = (list: SyntheticValueList) => {
+    if (!canManage) return;
+    setEditingId(list.id);
+    setDraft({
+      name: list.name,
+      description: list.description || '',
+      systemTag: list.systemTag || '',
+      listValues: list.listValues || '',
+      visibility: list.visibility || 'GLOBAL'
+    });
+    setEditorOpened(true);
+  };
+
+  const createList = () => {
+    if (!canManage) return;
+    setEditingId(null);
+    setDraft(EMPTY_EDITOR);
+    setEditorOpened(true);
+  };
+
+  const deleteList = async (list: SyntheticValueList) => {
+    if (!canManage) return;
+    const ok = await confirm({
+      title: 'Delete reference list',
+      message: `Delete @${list.name}? Saved generation plans that reference it will fail until it is recreated.`,
+      okText: 'Delete list',
+      danger: true
+    });
+    if (!ok) return;
+    try {
+      await apiFetch<void>(`/api/synthetic/value-lists/${list.id}`, { method: 'DELETE' });
+      notifications.show({ color: 'green', title: 'Reference list deleted', message: `@${list.name}` });
+      if (editingId === list.id) {
+        setEditingId(null);
+        setDraft(EMPTY_EDITOR);
+      }
+      await refresh();
+    } catch (error) {
+      notifications.show({ color: 'red', title: 'Could not delete reference list', message: error instanceof Error ? error.message : 'Delete failed' });
+    }
+  };
+
+  const copyReference = async (name: string) => {
+    try {
+      await navigator.clipboard.writeText(`@${name}`);
+      notifications.show({ color: 'blue', title: 'Reference copied', message: `@${name}` });
+    } catch {
+      notifications.show({ color: 'yellow', title: 'Copy unavailable', message: `Reference: @${name}` });
+    }
+  };
+
+  return (
+    <Stack gap="md">
+      {confirmElement}
+      <Group justify="space-between" align="flex-start" wrap="wrap">
+        <div>
+          <Text fw={850}>Reference value lists</Text>
+          <Text size="sm" c="dimmed">
+            Reusable values, weighted domains, and lookup mappings referenced as @name.
+          </Text>
+        </div>
+        {canManage ? (
+          <Group gap="xs">
+            <Button variant="light" leftSection={<IconPlus size={15} />} onClick={createList}>Create list</Button>
+            <Button leftSection={<IconDatabaseImport size={15} />} onClick={() => setImportOpened(true)}>Import live column</Button>
+          </Group>
+        ) : null}
+      </Group>
+
+      <Modal
+        opened={editorOpened}
+        onClose={() => {
+          if (saveMutation.isPending) return;
+          setEditorOpened(false);
+          setEditingId(null);
+          setDraft(EMPTY_EDITOR);
+        }}
+        title={editingId ? 'Edit reference list' : 'Create reference list'}
+        size="lg"
+        centered
+        closeOnClickOutside={!saveMutation.isPending}
+        closeOnEscape={!saveMutation.isPending}
+      >
+        <Stack gap="sm">
+          <Group justify="space-between" align="flex-start">
+            <Text size="xs" c="dimmed">
+              Plain: ACTIVE|INACTIVE. Weighted: ACTIVE:80|INACTIVE:20. Lookup: A=&gt;ALPHA|B=&gt;BETA.
+            </Text>
+            {editingId ? <Badge variant="light">Editing</Badge> : null}
+          </Group>
+          <SimpleGrid cols={{ base: 1, sm: 2 }}>
+            <NameInput
+              label="Reference name"
+              placeholder="bank-a.product_type"
+              value={draft.name}
+              disabled={Boolean(editingId)}
+              onChange={(value) => setDraft({ ...draft, name: value })}
+            />
+            <TextInput
+              {...technicalInputProps}
+              label="System tag"
+              placeholder="bank-a"
+              value={draft.systemTag}
+              onChange={(event) => setDraft({ ...draft, systemTag: event.currentTarget.value })}
+            />
+          </SimpleGrid>
+          <TextInput label="Description" value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.currentTarget.value })} />
+          <Textarea
+            {...technicalInputProps}
+            label="Values"
+            placeholder="CHECKING|SAVINGS|MONEY_MARKET"
+            autosize
+            minRows={5}
+            maxRows={12}
+            value={draft.listValues}
+            onChange={(event) => setDraft({ ...draft, listValues: event.currentTarget.value })}
+          />
+          <Select label="Visibility" data={['GLOBAL', 'PRIVATE']} value={draft.visibility} onChange={(value) => setDraft({ ...draft, visibility: value || 'GLOBAL' })} />
+          <Group justify="flex-end">
+            <Button
+              variant="subtle"
+              disabled={saveMutation.isPending}
+              onClick={() => {
+                setEditorOpened(false);
+                setEditingId(null);
+                setDraft(EMPTY_EDITOR);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button loading={saveMutation.isPending} disabled={!canManage} onClick={() => saveMutation.mutate()}>Save list</Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      <Modal
+        opened={importOpened}
+        onClose={() => !importMutation.isPending && setImportOpened(false)}
+        title="Import reference values from a live column"
+        size="xl"
+        centered
+        closeOnClickOutside={!importMutation.isPending}
+        closeOnEscape={!importMutation.isPending}
+      >
+        <Stack gap="sm">
+          <Text size="xs" c="dimmed">
+            Reads distinct values and optional frequencies. Columns with more than 200 distinct values are rejected as non-reference data.
+          </Text>
+          <QueryErrorBanner
+            errors={[schemasQuery.error, tablesQuery.error, columnsQuery.error]}
+            onRetry={() => Promise.all([schemasQuery.refetch(), tablesQuery.refetch(), columnsQuery.refetch()])}
+            title="Live reference-data catalog could not be loaded"
+          />
+          <Select
+            label="Data source"
+            placeholder="Choose source"
+            searchable
+            data={sourceOptions(dataSources, 'source')}
+            value={importDraft.dataSourceId}
+            onChange={(value) => setImportDraft({ ...importDraft, dataSourceId: value || '', schema: '', table: '', column: '' })}
+          />
+          <SimpleGrid cols={{ base: 1, sm: 3 }}>
+            <Select
+              label="Schema"
+              searchable
+              clearable
+              data={schemaOptions(schemasQuery.data)}
+              value={importDraft.schema || null}
+              onChange={(value) => setImportDraft({ ...importDraft, schema: value || '', table: '', column: '' })}
+              disabled={!importSourceId}
+            />
+            <Select
+              label="Table"
+              searchable
+              data={tableOptions(tablesQuery.data)}
+              value={importDraft.table || null}
+              onChange={(value) => setImportDraft({ ...importDraft, table: value || '', column: '' })}
+              disabled={!importSourceId}
+            />
+            <Select
+              label="Column"
+              searchable
+              data={(columnsQuery.data || []).map((column) => ({ value: column.column, label: `${column.column} (${column.type || 'unknown'})` }))}
+              value={importDraft.column || null}
+              onChange={(value) => setImportDraft({ ...importDraft, column: value || '' })}
+              disabled={!importDraft.table}
+            />
+          </SimpleGrid>
+          <SimpleGrid cols={{ base: 1, sm: 2 }}>
+            <NameInput label="Reference name" description="Optional; defaults from system and column." value={importDraft.name} onChange={(value) => setImportDraft({ ...importDraft, name: value })} />
+            <TextInput {...technicalInputProps} label="System tag" value={importDraft.systemTag} onChange={(event) => setImportDraft({ ...importDraft, systemTag: event.currentTarget.value })} />
+          </SimpleGrid>
+          <TextInput label="Description" value={importDraft.description} onChange={(event) => setImportDraft({ ...importDraft, description: event.currentTarget.value })} />
+          <Group justify="space-between" align="flex-end" wrap="wrap">
+            <Checkbox label="Store source frequencies as weights" checked={importDraft.weighted} onChange={(event) => setImportDraft({ ...importDraft, weighted: event.currentTarget.checked })} />
+            <Select w={150} label="Visibility" data={['GLOBAL', 'PRIVATE']} value={importDraft.visibility} onChange={(value) => setImportDraft({ ...importDraft, visibility: value || 'GLOBAL' })} />
+          </Group>
+          <Group justify="flex-end">
+            <Button variant="subtle" disabled={importMutation.isPending} onClick={() => setImportOpened(false)}>Cancel</Button>
+            <Button leftSection={<IconDatabaseImport size={15} />} loading={importMutation.isPending} disabled={!canManage} onClick={() => importMutation.mutate()}>Import values</Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      <div className="forge-grid-panel">
+        <ScrollArea>
+          <Table verticalSpacing="sm" highlightOnHover>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>Reference</Table.Th>
+                <Table.Th>System</Table.Th>
+                <Table.Th>Values</Table.Th>
+                <Table.Th>Visibility</Table.Th>
+                <Table.Th>Updated</Table.Th>
+                <Table.Th />
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {lists.map((list) => (
+                <Table.Tr key={list.id}>
+                  <Table.Td>
+                    <Text fw={800} ff="monospace">@{list.name}</Text>
+                    {list.description ? <Text size="xs" c="dimmed">{list.description}</Text> : null}
+                  </Table.Td>
+                  <Table.Td>{list.systemTag || '-'}</Table.Td>
+                  <Table.Td>
+                    <Text size="sm" ff="monospace" lineClamp={2}>{list.listValues}</Text>
+                    <Text size="xs" c="dimmed">{valueCount(list.listValues)} values</Text>
+                  </Table.Td>
+                  <Table.Td><Badge color={list.visibility === 'PRIVATE' ? 'yellow' : 'gray'} variant="light">{list.visibility || 'GLOBAL'}</Badge></Table.Td>
+                  <Table.Td>{formatDate(list.updatedAt)}</Table.Td>
+                  <Table.Td>
+                    <Group gap={4} justify="flex-end" wrap="nowrap">
+                      <Tooltip label="Copy @reference"><ActionIcon variant="subtle" aria-label={`Copy @${list.name}`} onClick={() => void copyReference(list.name)}><IconCopy size={15} /></ActionIcon></Tooltip>
+                      {canManage ? <Tooltip label="Edit"><ActionIcon variant="subtle" aria-label={`Edit @${list.name}`} onClick={() => editList(list)}><IconEdit size={15} /></ActionIcon></Tooltip> : null}
+                      {canManage ? <Tooltip label="Delete"><ActionIcon color="red" variant="subtle" aria-label={`Delete @${list.name}`} onClick={() => void deleteList(list)}><IconTrash size={15} /></ActionIcon></Tooltip> : null}
+                    </Group>
+                  </Table.Td>
+                </Table.Tr>
+              ))}
+              {!lists.length ? (
+                <Table.Tr><Table.Td colSpan={6}><Text c="dimmed" ta="center" py="xl">No reference lists yet. Create one or import a live reference column.</Text></Table.Td></Table.Tr>
+              ) : null}
+            </Table.Tbody>
+          </Table>
+        </ScrollArea>
+      </div>
+    </Stack>
+  );
+}
+
+function valueCount(values?: string | null) {
+  return String(values || '').split('|').map((value) => value.trim()).filter(Boolean).length;
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return '-';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString();
+}

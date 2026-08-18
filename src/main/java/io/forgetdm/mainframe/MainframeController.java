@@ -1,0 +1,444 @@
+package io.forgetdm.mainframe;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.forgetdm.audit.AuditService;
+import io.forgetdm.common.ApiException;
+import io.forgetdm.core.copybook.Copybook;
+import io.forgetdm.core.copybook.Field;
+import io.forgetdm.mainframe.transport.TransportFactory;
+import io.forgetdm.security.AccessContext;
+import io.forgetdm.security.OwnershipGuard;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+
+/** REST surface for the mainframe pipeline: connections (LPARs), copybook registry, and file jobs. */
+@RestController
+@RequestMapping("/api/mainframe")
+public class MainframeController {
+
+    private final MainframeConnectionRepository connections;
+    private final CopybookDefRepository copybooks;
+    private final CopybookMaskRepository masks;
+    private final MainframeJobRepository jobs;
+    private final MainframeJobFileRepository jobFiles;
+    private final TransportFactory transports;
+    private final MainframeMaskingService masking;
+    private final MainframeGenService fileGen;
+    private final OwnershipGuard ownership;
+    private final AuditService audit;
+    private final ObjectMapper json = new ObjectMapper().findAndRegisterModules();
+
+    public MainframeController(MainframeConnectionRepository connections, CopybookDefRepository copybooks,
+                              CopybookMaskRepository masks, MainframeJobRepository jobs,
+                              MainframeJobFileRepository jobFiles, TransportFactory transports,
+                              MainframeMaskingService masking, MainframeGenService fileGen,
+                              OwnershipGuard ownership, AuditService audit) {
+        this.connections = connections; this.copybooks = copybooks; this.masks = masks;
+        this.jobs = jobs; this.jobFiles = jobFiles; this.transports = transports; this.masking = masking;
+        this.fileGen = fileGen; this.ownership = ownership; this.audit = audit;
+    }
+
+    /** Generate synthetic records to a copybook layout, encode to EBCDIC, deliver or download. */
+    @PostMapping("/generate-file")
+    public Map<String, Object> generateFile(@RequestBody MainframeGenService.GenFileReq req) {
+        return fileGen.generateFile(req);
+    }
+
+    // ============================================================ connections
+
+    @GetMapping("/connections")
+    public List<MainframeConnectionEntity> listConnections() {
+        List<MainframeConnectionEntity> all = connections.findAll();
+        all.removeIf(c -> !MainframeOwnership.canSee(ownership, c.getOwnerUserId(),
+                c.getOwnerGroupId(), c.getVisibility()));
+        all.sort(Comparator.comparing(MainframeConnectionEntity::getName, String.CASE_INSENSITIVE_ORDER));
+        return all;
+    }
+
+    @PostMapping("/connections")
+    public MainframeConnectionEntity createConnection(@RequestBody MainframeConnectionEntity c) {
+        String type = c.getType() == null ? "" : c.getType().trim().toUpperCase(Locale.ROOT);
+        if (!Set.of("LOCAL", "ZOWE").contains(type)) throw ApiException.bad("type must be LOCAL or ZOWE");
+        c.setType(type);
+        if (c.getName() == null || c.getName().isBlank()) throw ApiException.bad("name required");
+        if (connections.findByName(c.getName()).isPresent())
+            throw ApiException.bad("A connection named '" + c.getName() + "' already exists");
+        if (type.equals("LOCAL") && (c.getBaseDir() == null || c.getBaseDir().isBlank()))
+            throw ApiException.bad("LOCAL connection needs a base directory");
+        if (type.equals("ZOWE") && (c.getHost() == null || c.getHost().isBlank()))
+            throw ApiException.bad("ZOWE connection needs a host");
+        c.setAuthType("BASIC");
+        c.setPasswordSecretRef(blankToNull(c.getPasswordSecretRef()));
+        if (c.getPasswordSecretRef() != null) c.setPassword(null);
+        if (c.getCodePage() == null || c.getCodePage().isBlank()) c.setCodePage("Cp037");
+        c.setId(null);
+        stamp(c);
+        MainframeConnectionEntity saved = connections.save(c);
+        auditConnection("MAINFRAME_CONNECTION_CREATED", saved);
+        return saved;
+    }
+
+    @PutMapping("/connections/{id}")
+    public MainframeConnectionEntity updateConnection(@PathVariable Long id,
+                                                       @RequestBody MainframeConnectionEntity update) {
+        MainframeConnectionEntity saved = conn(id);
+        String type = update.getType() == null ? saved.getType() : update.getType().trim().toUpperCase(Locale.ROOT);
+        if (!Set.of("LOCAL", "ZOWE").contains(type)) throw ApiException.bad("type must be LOCAL or ZOWE");
+        String name = update.getName() == null ? saved.getName() : update.getName().trim();
+        if (name.isBlank()) throw ApiException.bad("name required");
+        connections.findByName(name)
+                .filter(other -> !other.getId().equals(id))
+                .ifPresent(other -> { throw ApiException.bad("A connection named '" + name + "' already exists"); });
+        if (type.equals("LOCAL") && (update.getBaseDir() == null || update.getBaseDir().isBlank()))
+            throw ApiException.bad("LOCAL connection needs a base directory");
+        if (type.equals("ZOWE") && (update.getHost() == null || update.getHost().isBlank()))
+            throw ApiException.bad("ZOWE connection needs a host");
+
+        saved.setName(name);
+        saved.setType(type);
+        saved.setHost(blankToNull(update.getHost()));
+        saved.setPort(update.getPort());
+        saved.setBasePath(blankToNull(update.getBasePath()));
+        saved.setUsername(blankToNull(update.getUsername()));
+        saved.setAuthType("BASIC");
+        if (update.getPasswordSecretRef() != null) {
+            saved.setPasswordSecretRef(blankToNull(update.getPasswordSecretRef()));
+            if (saved.getPasswordSecretRef() != null) saved.setPassword(null);
+        }
+        if (update.getPassword() != null && !update.getPassword().isBlank()) {
+            saved.setPassword(update.getPassword());
+            saved.setPasswordSecretRef(null);
+        }
+        saved.setBaseDir(blankToNull(update.getBaseDir()));
+        saved.setCodePage(update.getCodePage() == null || update.getCodePage().isBlank() ? "Cp037" : update.getCodePage().trim());
+        saved.setTrustAllCerts(update.isTrustAllCerts());
+        MainframeConnectionEntity result = connections.save(saved);
+        auditConnection("MAINFRAME_CONNECTION_UPDATED", result);
+        return result;
+    }
+
+    @DeleteMapping("/connections/{id}")
+    public Map<String, Object> deleteConnection(@PathVariable Long id) {
+        MainframeConnectionEntity deleted = conn(id);
+        connections.deleteById(id);
+        auditConnection("MAINFRAME_CONNECTION_DELETED", deleted);
+        return Map.of("deleted", id);
+    }
+
+    @PostMapping("/connections/{id}/test")
+    public Map<String, Object> testConnection(@PathVariable Long id) {
+        MainframeConnectionEntity c = conn(id);
+        try {
+            var files = transports.forConnection(c).list(c, c.getType().equalsIgnoreCase("ZOWE") ? "**" : "*");
+            return Map.of("ok", true, "count", files.size());
+        } catch (Exception e) {
+            return Map.of("ok", false, "error", e.getMessage());
+        }
+    }
+
+    @GetMapping("/connections/{id}/files")
+    public List<?> listFiles(@PathVariable Long id, @RequestParam(required = false) String pattern) {
+        MainframeConnectionEntity c = conn(id);
+        return transports.forConnection(c).list(c, pattern);
+    }
+
+    @GetMapping("/connections/{id}/stat")
+    public Object statFile(@PathVariable Long id, @RequestParam String name) {
+        MainframeConnectionEntity c = conn(id);
+        return transports.forConnection(c).stat(c, name);
+    }
+
+    // ============================================================== copybooks
+
+    public record CopybookReq(String name, String source, String codePage) {}
+
+    @GetMapping("/copybooks")
+    public List<Map<String, Object>> listCopybooks() {
+        List<CopybookDefEntity> all = copybooks.findAll();
+        all.removeIf(d -> !MainframeOwnership.canSee(ownership, d.getOwnerUserId(),
+                d.getOwnerGroupId(), d.getVisibility()));
+        all.sort(Comparator.comparing(CopybookDefEntity::getName, String.CASE_INSENSITIVE_ORDER));
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (CopybookDefEntity d : all) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", d.getId()); m.put("name", d.getName()); m.put("codePage", d.getCodePage());
+            m.put("recordName", d.getRecordName()); m.put("recordLength", d.getRecordLength());
+            out.add(m);
+        }
+        return out;
+    }
+
+    @GetMapping("/copybooks/{id}")
+    public CopybookDefEntity getCopybook(@PathVariable Long id) { return copybook(id); }
+
+    @PostMapping("/copybooks")
+    public CopybookDefEntity createCopybook(@RequestBody CopybookReq req) {
+        if (req.name() == null || req.name().isBlank()) throw ApiException.bad("name required");
+        if (copybooks.findByName(req.name()).isPresent())
+            throw ApiException.bad("A copybook named '" + req.name() + "' already exists");
+        CopybookDefEntity d = new CopybookDefEntity();
+        d.setName(req.name().trim());
+        applyCopybook(d, req);
+        stamp(d);
+        CopybookDefEntity saved = copybooks.save(d);
+        auditCopybook("MAINFRAME_COPYBOOK_CREATED", saved, 0);
+        return saved;
+    }
+
+    @PutMapping("/copybooks/{id}")
+    public CopybookDefEntity updateCopybook(@PathVariable Long id, @RequestBody CopybookReq req) {
+        CopybookDefEntity d = copybook(id);
+        if (req.name() != null && !req.name().isBlank()) d.setName(req.name().trim());
+        applyCopybook(d, req);
+        d.setUpdatedAt(Instant.now());
+        CopybookDefEntity saved = copybooks.save(d);
+        auditCopybook("MAINFRAME_COPYBOOK_UPDATED", saved, masks.findByCopybookId(id).size());
+        return saved;
+    }
+
+    private void applyCopybook(CopybookDefEntity d, CopybookReq req) {
+        if (req.source() == null || req.source().isBlank()) throw ApiException.bad("copybook source required");
+        d.setSource(req.source());
+        d.setCodePage(req.codePage() == null || req.codePage().isBlank() ? "Cp037" : req.codePage().trim());
+        Copybook cb = CopybookSupport.parse(req.source());   // validates + computes layout
+        Field rec = cb.primaryRecord();
+        d.setRecordName(rec.name());
+        d.setRecordLength(rec.length());
+    }
+
+    @DeleteMapping("/copybooks/{id}")
+    public Map<String, Object> deleteCopybook(@PathVariable Long id) {
+        CopybookDefEntity deleted = copybook(id);
+        int maskCount = masks.findByCopybookId(id).size();
+        masks.deleteByCopybookId(id);
+        copybooks.deleteById(id);
+        auditCopybook("MAINFRAME_COPYBOOK_DELETED", deleted, maskCount);
+        return Map.of("deleted", id);
+    }
+
+    @GetMapping("/copybooks/{id}/fields")
+    public List<CopybookSupport.FieldInfo> copybookFields(@PathVariable Long id) {
+        CopybookDefEntity d = copybook(id);
+        Copybook cb = CopybookSupport.parse(d.getSource());
+        return CopybookSupport.structuralFields(cb, cb.primaryRecord());
+    }
+
+    @GetMapping("/copybooks/{id}/masks")
+    public List<CopybookMaskEntity> copybookMasks(@PathVariable Long id) {
+        copybook(id);
+        return masks.findByCopybookId(id);
+    }
+
+    public record MaskReq(String fieldPath, String function, String param1, String param2) {}
+
+    @PutMapping("/copybooks/{id}/masks")
+    public List<CopybookMaskEntity> saveCopybookMasks(@PathVariable Long id, @RequestBody List<MaskReq> req) {
+        copybook(id);                       // verify exists
+        masks.deleteByCopybookId(id);
+        List<CopybookMaskEntity> saved = new ArrayList<>();
+        for (MaskReq r : req) {
+            if (r.fieldPath() == null || r.fieldPath().isBlank()) continue;
+            if (r.function() == null || r.function().isBlank()) continue;
+            CopybookMaskEntity m = new CopybookMaskEntity();
+            m.setCopybookId(id);
+            m.setFieldPath(r.fieldPath().trim());
+            m.setFunction(r.function().trim().toUpperCase(Locale.ROOT));
+            m.setParam1(blankToNull(r.param1()));
+            m.setParam2(blankToNull(r.param2()));
+            saved.add(masks.save(m));
+        }
+        auditCopybookMasks(id, saved);
+        return saved;
+    }
+
+    // =================================================================== jobs
+
+    public record JobFileReq(String sourceName, Long copybookId, String recfm, Integer lrecl, String codePage,
+                             Long targetConnectionId, String targetName) {}
+    public record JobReq(String name, Long sourceConnectionId, Long targetConnectionId, String maskingSeed,
+                         List<JobFileReq> files) {}
+
+    @GetMapping("/jobs")
+    public List<MainframeJobEntity> listJobs() {
+        List<MainframeJobEntity> all = jobs.findAll();
+        all.removeIf(j -> !MainframeOwnership.canSee(ownership, j.getOwnerUserId(),
+                j.getOwnerGroupId(), j.getVisibility()));
+        all.sort(Comparator.comparing(MainframeJobEntity::getId).reversed());
+        return all;
+    }
+
+    @GetMapping("/jobs/{id}")
+    public Map<String, Object> getJob(@PathVariable Long id) {
+        MainframeJobEntity job = job(id);
+        return Map.of("job", job, "files", jobFiles.findByJobIdOrderByOrdinalAsc(id));
+    }
+
+    @PostMapping("/jobs")
+    public Map<String, Object> createJob(@RequestBody JobReq req) {
+        if (req.name() == null || req.name().isBlank()) throw ApiException.bad("job name required");
+        if (req.sourceConnectionId() == null) throw ApiException.bad("source connection required");
+        if (req.targetConnectionId() == null) throw ApiException.bad("target connection required");
+        if (req.files() == null || req.files().isEmpty()) throw ApiException.bad("add at least one file");
+
+        // Resolve every caller-supplied object id before creating any job or child rows.
+        conn(req.sourceConnectionId());
+        conn(req.targetConnectionId());
+        for (JobFileReq f : req.files()) {
+            if (f == null || f.sourceName() == null || f.sourceName().isBlank())
+                throw ApiException.bad("each file needs a source name");
+            if (f.copybookId() == null) throw ApiException.bad("each file needs a copybook");
+            copybook(f.copybookId());
+            if (f.targetConnectionId() != null) conn(f.targetConnectionId());
+        }
+
+        MainframeJobEntity job = new MainframeJobEntity();
+        job.setName(req.name().trim());
+        job.setSourceConnectionId(req.sourceConnectionId());
+        job.setTargetConnectionId(req.targetConnectionId());
+        job.setMaskingSeed(blankToNull(req.maskingSeed()));
+        job.setCreatedBy(AccessContext.current().map(p -> p.username()).orElse("system"));
+        stamp(job);
+        job.setStatus("PENDING");
+        job.setFilesTotal(req.files().size());
+        job = jobs.save(job);
+
+        int ord = 0;
+        for (JobFileReq f : req.files()) {
+            MainframeJobFileEntity e = new MainframeJobFileEntity();
+            e.setJobId(job.getId());
+            e.setSourceName(f.sourceName().trim());
+            e.setCopybookId(f.copybookId());
+            e.setRecfm(f.recfm() == null || f.recfm().isBlank() ? "FB" : f.recfm().trim().toUpperCase(Locale.ROOT));
+            e.setLrecl(f.lrecl());
+            e.setCodePage(blankToNull(f.codePage()));
+            e.setTargetConnectionId(f.targetConnectionId());
+            e.setTargetName(blankToNull(f.targetName()));
+            e.setOrdinal(ord++);
+            jobFiles.save(e);
+        }
+
+        masking.submitAsync(job.getId());
+        return Map.of("job", job, "files", jobFiles.findByJobIdOrderByOrdinalAsc(job.getId()));
+    }
+
+    @PostMapping("/jobs/{id}/cancel")
+    public Map<String, Object> cancelJob(@PathVariable Long id) {
+        MainframeJobEntity job = masking.cancel(id);
+        return Map.of("job", job, "files", jobFiles.findByJobIdOrderByOrdinalAsc(job.getId()));
+    }
+
+    @PostMapping("/jobs/{id}/retry")
+    public Map<String, Object> retryJob(@PathVariable Long id) {
+        MainframeJobEntity job = masking.retry(id);
+        return Map.of("job", job, "files", jobFiles.findByJobIdOrderByOrdinalAsc(job.getId()));
+    }
+
+    // =============================================================== helpers
+
+    private MainframeConnectionEntity conn(Long id) {
+        MainframeConnectionEntity connection = connections.findById(id)
+                .orElseThrow(() -> ApiException.notFound("Connection " + id + " not found"));
+        MainframeOwnership.assertCanSee(ownership, "mainframe connection", id, connection.getOwnerUserId(),
+                connection.getOwnerGroupId(), connection.getVisibility());
+        return connection;
+    }
+
+    private CopybookDefEntity copybook(Long id) {
+        CopybookDefEntity copybook = copybooks.findById(id)
+                .orElseThrow(() -> ApiException.notFound("Copybook " + id + " not found"));
+        MainframeOwnership.assertCanSee(ownership, "mainframe copybook", id, copybook.getOwnerUserId(),
+                copybook.getOwnerGroupId(), copybook.getVisibility());
+        return copybook;
+    }
+
+    private MainframeJobEntity job(Long id) {
+        MainframeJobEntity job = jobs.findById(id)
+                .orElseThrow(() -> ApiException.notFound("Job " + id + " not found"));
+        MainframeOwnership.assertCanSee(ownership, "mainframe job", id, job.getOwnerUserId(),
+                job.getOwnerGroupId(), job.getVisibility());
+        return job;
+    }
+
+    private void stamp(MainframeConnectionEntity entity) {
+        entity.setOwnerUserId(ownership.defaultOwnerUserId());
+        entity.setOwnerUsername(ownership.defaultOwnerUsername());
+        entity.setOwnerGroupId(ownership.defaultOwnerGroupId());
+        entity.setVisibility(ownership.defaultVisibility());
+    }
+
+    private void stamp(CopybookDefEntity entity) {
+        entity.setOwnerUserId(ownership.defaultOwnerUserId());
+        entity.setOwnerUsername(ownership.defaultOwnerUsername());
+        entity.setOwnerGroupId(ownership.defaultOwnerGroupId());
+        entity.setVisibility(ownership.defaultVisibility());
+    }
+
+    private void stamp(MainframeJobEntity entity) {
+        entity.setOwnerUserId(ownership.defaultOwnerUserId());
+        entity.setOwnerUsername(ownership.defaultOwnerUsername());
+        entity.setOwnerGroupId(ownership.defaultOwnerGroupId());
+        entity.setVisibility(ownership.defaultVisibility());
+    }
+
+    private void auditConnection(String action, MainframeConnectionEntity c) {
+        audit.record(currentUsername(), action, "MAINFRAME", "mainframe-connection", String.valueOf(c.getId()),
+                c.getName(), "SUCCESS", "Mainframe connection registry changed",
+                writeJson(Map.of(
+                        "type", safe(c.getType()),
+                        "codePage", safe(c.getCodePage()),
+                        "trustAllCerts", c.isTrustAllCerts(),
+                        "hostConfigured", c.getHost() != null && !c.getHost().isBlank(),
+                        "basePathConfigured", c.getBasePath() != null && !c.getBasePath().isBlank(),
+                        "baseDirConfigured", c.getBaseDir() != null && !c.getBaseDir().isBlank(),
+                        "usernameConfigured", c.getUsername() != null && !c.getUsername().isBlank(),
+                        "visibility", safe(c.getVisibility()))));
+    }
+
+    private void auditCopybook(String action, CopybookDefEntity d, int maskCount) {
+        audit.record(currentUsername(), action, "MAINFRAME", "mainframe-copybook", String.valueOf(d.getId()),
+                d.getName(), "SUCCESS", "Mainframe copybook registry changed",
+                writeJson(Map.of(
+                        "codePage", safe(d.getCodePage()),
+                        "recordName", safe(d.getRecordName()),
+                        "recordLength", d.getRecordLength() == null ? 0 : d.getRecordLength(),
+                        "sourceLength", d.getSource() == null ? 0 : d.getSource().length(),
+                        "maskRuleCount", Math.max(0, maskCount),
+                        "visibility", safe(d.getVisibility()))));
+    }
+
+    private void auditCopybookMasks(Long copybookId, List<CopybookMaskEntity> saved) {
+        CopybookDefEntity d = copybook(copybookId);
+        Set<String> functions = new java.util.TreeSet<>();
+        for (CopybookMaskEntity mask : saved) {
+            if (mask.getFunction() != null && !mask.getFunction().isBlank()) functions.add(mask.getFunction());
+        }
+        audit.record(currentUsername(), "MAINFRAME_COPYBOOK_MASKS_REPLACED", "MAINFRAME",
+                "mainframe-copybook", String.valueOf(copybookId), d.getName(), "SUCCESS",
+                "Mainframe copybook mask registry replaced",
+                writeJson(Map.of("maskRuleCount", saved.size(), "functionCount", functions.size(),
+                        "functions", functions)));
+    }
+
+    private String writeJson(Object value) {
+        try { return json.writeValueAsString(value == null ? Map.of() : value); }
+        catch (Exception e) { return "{}"; }
+    }
+
+    private static String currentUsername() {
+        return AccessContext.current().map(p -> p.username()).orElse("system");
+    }
+
+    private static String safe(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private static String blankToNull(String s) { return s == null || s.isBlank() ? null : s; }
+}

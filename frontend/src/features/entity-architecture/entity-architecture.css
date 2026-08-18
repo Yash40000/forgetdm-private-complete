@@ -1,0 +1,1380 @@
+.entity-architecture-page {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100dvh - 64px);
+  padding: 22px clamp(18px, 2.2vw, 34px) 26px;
+  background: var(--mantine-color-body);
+}
+
+.entity-architecture-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  padding-bottom: 16px;
+}
+
+.entity-architecture-header h1 {
+  margin: 2px 0 2px;
+  font-size: 28px;
+  line-height: 1.15;
+  letter-spacing: 0;
+}
+
+.entity-architecture-eyebrow {
+  color: var(--mantine-color-blue-6);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .05em;
+}
+
+.entity-architecture-app-strip {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  overflow-x: auto;
+  border: 1px solid var(--mantine-color-default-border);
+  border-bottom: 0;
+  border-radius: 7px 7px 0 0;
+  background: var(--mantine-color-default);
+}
+
+.entity-architecture-app-item {
+  display: flex;
+  flex: 0 0 auto;
+  min-width: 250px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 12px;
+  border-right: 1px solid var(--mantine-color-default-border);
+}
+
+.entity-architecture-canvas,
+.entity-architecture-empty {
+  position: relative;
+  flex: 1;
+  min-height: 520px;
+  height: calc(100dvh - 235px);
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: 0 0 7px 7px;
+  overflow: hidden;
+  background: var(--mantine-color-body);
+}
+
+.entity-architecture-page > .entity-architecture-canvas:first-of-type,
+.entity-architecture-page > .entity-architecture-empty:first-of-type {
+  border-radius: 7px;
+}
+
+.entity-architecture-empty {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 8px;
+  text-align: center;
+  color: var(--mantine-color-dimmed);
+}
+
+.entity-architecture-canvas {
+  display: flex;
+  flex-direction: column;
+}
+
+.entity-architecture-canvas.is-expanded {
+  position: fixed;
+  z-index: 500;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  min-height: 100dvh;
+  border-radius: 0;
+  background: var(--mantine-color-body);
+}
+
+.entity-architecture-diagram-head,
+.entity-architecture-diagram-toolbar,
+.entity-architecture-diagram-foot {
+  flex: 0 0 auto;
+  background: var(--mantine-color-body);
+}
+
+.entity-architecture-diagram-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 14px 16px 11px;
+}
+
+.entity-architecture-diagram-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 48px;
+  padding: 8px 16px;
+  border-top: 1px solid var(--mantine-color-default-border);
+  border-bottom: 1px solid var(--mantine-color-default-border);
+}
+
+.entity-architecture-legend {
+  flex-wrap: wrap;
+}
+
+.entity-architecture-legend-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--mantine-color-dimmed);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.entity-architecture-legend-chip::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid var(--mantine-color-default-border);
+  border-radius: 3px;
+  background: var(--mantine-color-body);
+}
+
+.entity-architecture-legend-chip.is-selected::before {
+  border-color: var(--mantine-color-blue-6);
+  background: var(--mantine-color-blue-light);
+}
+
+.entity-architecture-legend-chip.is-parent::before {
+  border-color: color-mix(in srgb, var(--mantine-color-blue-6) 48%, var(--mantine-color-default-border));
+  background: color-mix(in srgb, var(--mantine-color-blue-6) 12%, transparent);
+}
+
+.entity-architecture-legend-chip.is-child::before {
+  border-color: color-mix(in srgb, var(--mantine-color-teal-6) 52%, var(--mantine-color-default-border));
+  background: color-mix(in srgb, var(--mantine-color-teal-6) 13%, transparent);
+}
+
+.entity-architecture-legend-chip.is-related::before {
+  border-color: color-mix(in srgb, var(--mantine-color-violet-6) 56%, var(--mantine-color-default-border));
+  background: color-mix(in srgb, var(--mantine-color-violet-6) 13%, transparent);
+}
+
+.entity-architecture-legend-chip.is-identity::before {
+  border-color: color-mix(in srgb, var(--mantine-color-violet-6) 55%, var(--mantine-color-default-border));
+  background: color-mix(in srgb, var(--mantine-color-violet-6) 13%, transparent);
+}
+
+.entity-architecture-legend-chip.is-cross::before {
+  border-color: color-mix(in srgb, var(--mantine-color-teal-6) 64%, var(--mantine-color-default-border));
+  background: color-mix(in srgb, var(--mantine-color-teal-6) 16%, transparent);
+}
+
+.entity-architecture-viewport-shell {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.entity-architecture-viewport {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  scrollbar-gutter: stable both-edges;
+  overscroll-behavior: contain;
+  background-color: color-mix(in srgb, var(--mantine-color-body) 93%, var(--mantine-color-blue-light));
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--mantine-color-default-border) 66%, transparent) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+.entity-architecture-canvas-actions {
+  position: absolute;
+  z-index: 30;
+  top: 12px;
+  right: 26px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(720px, calc(100% - 52px));
+  padding: 8px 9px 8px 12px;
+  border: 1px solid color-mix(in srgb, var(--mantine-color-blue-6) 32%, var(--mantine-color-default-border));
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--mantine-color-body) 94%, var(--mantine-color-blue-light));
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--mantine-color-dark-9) 16%, transparent);
+}
+
+.entity-architecture-canvas-selection-copy {
+  display: grid;
+  min-width: 0;
+  max-width: 280px;
+}
+
+.entity-architecture-canvas-selection-copy b,
+.entity-architecture-canvas-selection-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entity-architecture-canvas-selection-copy b {
+  font-size: 11.5px;
+}
+
+.entity-architecture-canvas-selection-copy small {
+  color: var(--mantine-color-dimmed);
+  font-family: var(--font-mono, Consolas), monospace;
+  font-size: 9.5px;
+}
+
+.entity-architecture-canvas-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 31px;
+  padding: 5px 10px;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: 6px;
+  color: var(--mantine-color-text);
+  background: var(--mantine-color-body);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.entity-architecture-canvas-actions button.is-danger {
+  color: var(--mantine-color-red-7);
+  border-color: color-mix(in srgb, var(--mantine-color-red-6) 38%, var(--mantine-color-default-border));
+  background: color-mix(in srgb, var(--mantine-color-red-light) 46%, var(--mantine-color-body));
+}
+
+.entity-architecture-canvas-actions button:hover {
+  filter: brightness(.98);
+}
+
+.entity-architecture-flow-board {
+  position: relative;
+  min-width: 100%;
+  min-height: 100%;
+}
+
+.entity-architecture-flow-board .react-flow {
+  width: 100%;
+  height: 100%;
+}
+
+.entity-architecture-flow-board .react-flow__pane {
+  cursor: grab;
+}
+
+.entity-architecture-flow-board .react-flow__pane:active {
+  cursor: grabbing;
+}
+
+.entity-architecture-flow-board .react-flow__controls,
+.entity-architecture-flow-board .react-flow__minimap {
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: 7px;
+  overflow: hidden;
+  box-shadow: var(--mantine-shadow-xs);
+}
+
+.entity-architecture-flow-board .react-flow__controls-button {
+  border-color: var(--mantine-color-default-border);
+  color: var(--mantine-color-text);
+  background: var(--mantine-color-body);
+}
+
+.entity-architecture-flow-board .react-flow__minimap {
+  background: color-mix(in srgb, var(--mantine-color-body) 94%, var(--mantine-color-blue-light));
+}
+
+.entity-architecture-flow-app,
+.entity-architecture-flow-table,
+.entity-architecture-flow-entity {
+  width: 286px;
+  color: var(--mantine-color-text);
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: 7px;
+  background: var(--mantine-color-body);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--mantine-color-dark-9) 9%, transparent);
+}
+
+.entity-architecture-flow-app {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-height: 58px;
+  padding: 10px 12px;
+  border-color: color-mix(in srgb, var(--mantine-color-blue-6) 34%, var(--mantine-color-default-border));
+  background: color-mix(in srgb, var(--mantine-color-blue-light) 44%, var(--mantine-color-body));
+}
+
+.entity-architecture-flow-app.tone-1 {
+  border-color: color-mix(in srgb, var(--mantine-color-teal-6) 38%, var(--mantine-color-default-border));
+  background: color-mix(in srgb, var(--mantine-color-teal-light) 45%, var(--mantine-color-body));
+}
+
+.entity-architecture-flow-app.tone-2 {
+  border-color: color-mix(in srgb, var(--mantine-color-yellow-6) 42%, var(--mantine-color-default-border));
+  background: color-mix(in srgb, var(--mantine-color-yellow-light) 42%, var(--mantine-color-body));
+}
+
+.entity-architecture-flow-app.tone-3 {
+  border-color: color-mix(in srgb, var(--mantine-color-violet-6) 36%, var(--mantine-color-default-border));
+  background: color-mix(in srgb, var(--mantine-color-violet-light) 38%, var(--mantine-color-body));
+}
+
+.entity-architecture-flow-app-icon {
+  display: grid;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 6px;
+  color: var(--mantine-color-blue-7);
+  background: var(--mantine-color-blue-light);
+}
+
+.entity-architecture-flow-app > div:last-child {
+  display: grid;
+  min-width: 0;
+}
+
+.entity-architecture-flow-app b,
+.entity-architecture-flow-app small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entity-architecture-flow-app b {
+  font-size: 13px;
+}
+
+.entity-architecture-flow-app small {
+  color: var(--mantine-color-dimmed);
+  font-size: 10.5px;
+}
+
+.entity-architecture-flow-table {
+  overflow: visible;
+  transition: border-color 130ms ease, box-shadow 130ms ease, opacity 130ms ease;
+}
+
+.entity-architecture-flow-table:hover {
+  border-color: color-mix(in srgb, var(--mantine-color-blue-6) 52%, var(--mantine-color-default-border));
+}
+
+.entity-architecture-flow-table.is-selected,
+.entity-architecture-flow-table.is-selected.is-selected {
+  border-color: var(--mantine-color-blue-6);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--mantine-color-blue-6) 22%, transparent), 0 8px 20px color-mix(in srgb, var(--mantine-color-dark-9) 12%, transparent);
+}
+
+.entity-architecture-flow-board .react-flow__node.selected .entity-architecture-flow-table {
+  border-color: var(--mantine-color-blue-6);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--mantine-color-blue-6) 26%, transparent), 0 9px 22px color-mix(in srgb, var(--mantine-color-dark-9) 14%, transparent);
+}
+
+.entity-architecture-flow-board .react-flow__selection,
+.entity-architecture-flow-board .react-flow__nodesselection-rect {
+  border: 1px solid var(--mantine-color-blue-5);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--mantine-color-blue-light) 45%, transparent);
+}
+
+.entity-architecture-flow-table.is-parent {
+  border-color: color-mix(in srgb, var(--mantine-color-blue-6) 62%, var(--mantine-color-default-border));
+  background: color-mix(in srgb, var(--mantine-color-blue-light) 15%, var(--mantine-color-body));
+}
+
+.entity-architecture-flow-table.is-child {
+  border-color: color-mix(in srgb, var(--mantine-color-teal-6) 64%, var(--mantine-color-default-border));
+  background: color-mix(in srgb, var(--mantine-color-teal-light) 15%, var(--mantine-color-body));
+}
+
+.entity-architecture-flow-table.is-related {
+  border-color: color-mix(in srgb, var(--mantine-color-violet-6) 62%, var(--mantine-color-default-border));
+  background: color-mix(in srgb, var(--mantine-color-violet-light) 13%, var(--mantine-color-body));
+}
+
+.entity-architecture-flow-table.is-dim {
+  opacity: .26;
+}
+
+.entity-architecture-flow-table-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 7px;
+  min-height: 52px;
+  padding: 8px 8px 8px 11px;
+  border-radius: 6px 6px 0 0;
+  background: color-mix(in srgb, var(--mantine-color-default) 75%, var(--mantine-color-body));
+  cursor: grab;
+  user-select: none;
+}
+
+.entity-architecture-flow-table-head:active {
+  cursor: grabbing;
+}
+
+.entity-architecture-flow-table-head > div {
+  display: grid;
+  min-width: 0;
+}
+
+.entity-architecture-flow-table-head b,
+.entity-architecture-flow-table-head small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entity-architecture-flow-table-head b {
+  font-size: 12.5px;
+}
+
+.entity-architecture-flow-table-head small {
+  color: var(--mantine-color-dimmed);
+  font-size: 9.5px;
+}
+
+.entity-architecture-flow-table-head button {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 5px;
+  color: var(--mantine-color-dimmed);
+  background: transparent;
+  cursor: pointer;
+}
+
+.entity-architecture-flow-table-head button:hover {
+  color: var(--mantine-color-blue-7);
+  background: var(--mantine-color-blue-light);
+}
+
+.entity-architecture-flow-table-head button.is-delete:hover {
+  color: var(--mantine-color-red-7);
+  background: var(--mantine-color-red-light);
+}
+
+.entity-architecture-flow-columns {
+  overflow: visible;
+  border-top: 1px solid var(--mantine-color-default-border);
+}
+
+.entity-architecture-flow-column {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 31px;
+  padding: 5px 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--mantine-color-default-border) 72%, transparent);
+  background: var(--mantine-color-body);
+}
+
+.entity-architecture-flow-column:last-child {
+  border-bottom: 0;
+  border-radius: 0 0 6px 6px;
+}
+
+.entity-architecture-flow-column:hover {
+  background: color-mix(in srgb, var(--mantine-color-blue-light) 22%, var(--mantine-color-body));
+}
+
+.entity-architecture-flow-column > span,
+.entity-architecture-flow-column > small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entity-architecture-flow-column > span {
+  font-family: var(--font-mono, Consolas), monospace;
+  font-size: 10.5px;
+  font-weight: 650;
+}
+
+.entity-architecture-flow-column > small {
+  color: var(--mantine-color-dimmed);
+  font-size: 8.5px;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.entity-architecture-key-port {
+  width: 11px !important;
+  height: 11px !important;
+  border: 2px solid var(--mantine-color-body) !important;
+  box-shadow: 0 0 0 1px currentColor;
+  transition: transform 100ms ease, box-shadow 100ms ease;
+}
+
+.entity-architecture-key-port::after {
+  position: absolute;
+  inset: -9px;
+  content: '';
+  border-radius: 50%;
+}
+
+.entity-architecture-key-port:hover {
+  transform: scale(1.35);
+  box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 18%, transparent);
+}
+
+.entity-architecture-key-port.connectingfrom,
+.entity-architecture-key-port.connectingto,
+.entity-architecture-key-port.valid {
+  transform: scale(1.45);
+  box-shadow: 0 0 0 5px color-mix(in srgb, currentColor 22%, transparent);
+}
+
+.entity-architecture-key-port.is-input {
+  left: -6px !important;
+  color: var(--mantine-color-teal-7);
+  background: var(--mantine-color-teal-6) !important;
+}
+
+.entity-architecture-key-port.is-output {
+  right: -6px !important;
+  color: var(--mantine-color-blue-7);
+  background: var(--mantine-color-blue-6) !important;
+}
+
+.entity-architecture-flow-empty {
+  padding: 13px 12px;
+  color: var(--mantine-color-dimmed);
+  font-size: 10.5px;
+  text-align: center;
+}
+
+.entity-architecture-flow-empty.is-error {
+  color: var(--mantine-color-red-7);
+  background: var(--mantine-color-red-light);
+}
+
+.entity-architecture-flow-entity {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 12px 16px;
+  border-color: color-mix(in srgb, var(--mantine-color-violet-6) 55%, var(--mantine-color-default-border));
+  color: var(--mantine-color-violet-8);
+  background: color-mix(in srgb, var(--mantine-color-violet-light) 48%, var(--mantine-color-body));
+  text-align: center;
+}
+
+.entity-architecture-flow-entity small {
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: .08em;
+}
+
+.entity-architecture-flow-entity b {
+  font-size: 13px;
+}
+
+.entity-architecture-delete-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 4px 9px;
+  border: 1px solid color-mix(in srgb, var(--mantine-color-red-6) 40%, var(--mantine-color-default-border));
+  border-radius: 6px;
+  color: var(--mantine-color-red-7);
+  background: var(--mantine-color-red-light);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.entity-architecture-flow-board .react-flow__edge.is-cross path,
+.entity-architecture-flow-board .react-flow__edge.entity-architecture-edge.is-cross path {
+  stroke: var(--mantine-color-teal-6);
+  stroke-width: 2.2;
+  stroke-dasharray: 7 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.entity-architecture-flow-board .react-flow__edge-path {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: stroke 120ms ease, stroke-width 120ms ease, opacity 120ms ease;
+}
+
+.entity-architecture-flow-board .react-flow__edge.selected path {
+  stroke: var(--mantine-color-red-6) !important;
+  stroke-width: 3.4 !important;
+  stroke-dasharray: none !important;
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--mantine-color-red-6) 42%, transparent));
+}
+
+.entity-architecture-flow-board .react-flow__edge.is-dim {
+  opacity: .14;
+}
+
+.entity-architecture-flow-board .react-flow__edge-text {
+  fill: var(--mantine-color-dimmed);
+  font-family: var(--font-mono, Consolas), monospace;
+  font-size: 9px;
+}
+
+.entity-architecture-flow-board .react-flow__edge-textbg {
+  fill: var(--mantine-color-body);
+  fill-opacity: .94;
+}
+
+.entity-architecture-svg {
+  display: block;
+  min-width: 100%;
+  min-height: 100%;
+  max-width: none;
+}
+
+.entity-architecture-application-node .entity-architecture-lane-box {
+  fill: color-mix(in srgb, var(--mantine-color-body) 95%, var(--mantine-color-blue-light));
+  stroke: var(--mantine-color-default-border);
+  stroke-width: 1.25;
+}
+
+.entity-architecture-application-node .entity-architecture-lane-head {
+  fill: color-mix(in srgb, var(--mantine-color-blue-light) 48%, var(--mantine-color-body));
+}
+
+.entity-architecture-application-node.tone-1 .entity-architecture-lane-head {
+  fill: color-mix(in srgb, var(--mantine-color-teal-light) 58%, var(--mantine-color-body));
+}
+
+.entity-architecture-application-node.tone-2 .entity-architecture-lane-head {
+  fill: color-mix(in srgb, var(--mantine-color-yellow-light) 54%, var(--mantine-color-body));
+}
+
+.entity-architecture-application-node.tone-3 .entity-architecture-lane-head {
+  fill: color-mix(in srgb, var(--mantine-color-violet-light) 48%, var(--mantine-color-body));
+}
+
+.entity-architecture-lane-title,
+.entity-architecture-table-title,
+.entity-architecture-column-name,
+.entity-architecture-hub-title {
+  fill: var(--mantine-color-text);
+}
+
+.entity-architecture-lane-title {
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.entity-architecture-lane-subtitle,
+.entity-architecture-lane-count,
+.entity-architecture-lane-loading,
+.entity-architecture-table-count,
+.entity-architecture-column-detail,
+.entity-architecture-no-detail,
+.entity-architecture-edge-label {
+  fill: var(--mantine-color-dimmed);
+}
+
+.entity-architecture-lane-subtitle {
+  font-size: 10.5px;
+}
+
+.entity-architecture-lane-count,
+.entity-architecture-lane-loading,
+.entity-architecture-table-count,
+.entity-architecture-column-detail,
+.entity-architecture-edge-label,
+.entity-architecture-hub-kicker {
+  font-family: var(--font-mono, Consolas), monospace;
+}
+
+.entity-architecture-lane-count {
+  fill: var(--mantine-color-blue-6);
+  font-size: 9.5px;
+  font-weight: 800;
+}
+
+.entity-architecture-lane-loading {
+  font-size: 9.5px;
+}
+
+.entity-architecture-edge path {
+  fill: none;
+  stroke: color-mix(in srgb, var(--mantine-color-default-border) 86%, var(--mantine-color-dimmed));
+  stroke-width: 1.5;
+  transition: stroke 120ms ease, opacity 120ms ease;
+}
+
+.entity-architecture-edge.is-hot path {
+  stroke: var(--mantine-color-blue-6);
+  stroke-width: 2.3;
+}
+
+.entity-architecture-edge.is-identity path {
+  stroke: var(--mantine-color-violet-6);
+  stroke-dasharray: 6 4;
+}
+
+.entity-architecture-edge.is-cross path {
+  stroke: var(--mantine-color-teal-6);
+  stroke-width: 2.1;
+  stroke-dasharray: 8 4;
+}
+
+.entity-architecture-edge.is-dim {
+  opacity: .18;
+}
+
+.entity-architecture-arrow {
+  fill: color-mix(in srgb, var(--mantine-color-default-border) 75%, var(--mantine-color-dimmed));
+}
+
+.entity-architecture-identity-arrow {
+  fill: var(--mantine-color-violet-6);
+}
+
+.entity-architecture-cross-arrow {
+  fill: var(--mantine-color-teal-6);
+}
+
+.entity-architecture-edge-label {
+  font-size: 9.5px;
+  paint-order: stroke;
+  stroke: var(--mantine-color-body);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+.entity-architecture-table-node {
+  cursor: pointer;
+  transition: opacity 120ms ease;
+}
+
+.entity-architecture-table-node:focus {
+  outline: none;
+}
+
+.entity-architecture-table-box {
+  fill: var(--mantine-color-body);
+  stroke: var(--mantine-color-default-border);
+  stroke-width: 1.5;
+  filter: drop-shadow(0 2px 4px color-mix(in srgb, var(--mantine-color-dark-9) 8%, transparent));
+  transition: stroke 120ms ease, fill 120ms ease;
+}
+
+.entity-architecture-table-head {
+  fill: color-mix(in srgb, var(--mantine-color-default) 70%, var(--mantine-color-body));
+}
+
+.entity-architecture-table-node:hover .entity-architecture-table-box,
+.entity-architecture-table-node:focus-visible .entity-architecture-table-box {
+  stroke: color-mix(in srgb, var(--mantine-color-blue-6) 58%, var(--mantine-color-default-border));
+}
+
+.entity-architecture-table-title {
+  font-size: 12px;
+  font-weight: 780;
+}
+
+.entity-architecture-table-count {
+  fill: var(--mantine-color-blue-6);
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.entity-architecture-column-name {
+  font-size: 10.5px;
+  font-weight: 650;
+}
+
+.entity-architecture-column-detail {
+  font-size: 9.5px;
+}
+
+.entity-architecture-column-detail.is-pk {
+  fill: var(--mantine-color-blue-6);
+}
+
+.entity-architecture-column-detail.is-fk {
+  fill: var(--mantine-color-teal-7);
+}
+
+.entity-architecture-column-detail.is-pii {
+  fill: var(--mantine-color-violet-6);
+}
+
+.entity-architecture-no-detail {
+  font-size: 10px;
+  font-style: italic;
+}
+
+.entity-architecture-table-node.is-selected .entity-architecture-table-box {
+  stroke: var(--mantine-color-blue-6);
+  stroke-width: 2.4;
+}
+
+.entity-architecture-table-node.is-selected .entity-architecture-table-head {
+  fill: var(--mantine-color-blue-light);
+}
+
+.entity-architecture-table-node.is-parent .entity-architecture-table-box {
+  fill: color-mix(in srgb, var(--mantine-color-blue-6) 5%, var(--mantine-color-body));
+  stroke: color-mix(in srgb, var(--mantine-color-blue-6) 52%, var(--mantine-color-default-border));
+}
+
+.entity-architecture-table-node.is-child .entity-architecture-table-box {
+  fill: color-mix(in srgb, var(--mantine-color-teal-6) 6%, var(--mantine-color-body));
+  stroke: color-mix(in srgb, var(--mantine-color-teal-6) 56%, var(--mantine-color-default-border));
+}
+
+.entity-architecture-table-node.is-dim {
+  opacity: .3;
+}
+
+.entity-architecture-hub-node rect {
+  fill: color-mix(in srgb, var(--mantine-color-dark-9) 90%, var(--mantine-color-violet-9));
+  stroke: color-mix(in srgb, var(--mantine-color-violet-5) 60%, var(--mantine-color-dark-9));
+  stroke-width: 1.5;
+  filter: drop-shadow(0 4px 8px color-mix(in srgb, var(--mantine-color-dark-9) 16%, transparent));
+}
+
+.entity-architecture-hub-kicker {
+  fill: var(--mantine-color-violet-2);
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.entity-architecture-hub-title {
+  fill: white;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.entity-architecture-diagram-foot {
+  min-height: 36px;
+  padding: 8px 16px;
+  border-top: 1px solid var(--mantine-color-default-border);
+}
+
+.entity-architecture-diagram-foot button {
+  appearance: none;
+  padding: 0;
+  border: 0;
+  color: var(--mantine-color-blue-6);
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.entity-architecture-anchor-row {
+  padding: 13px;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--mantine-color-default) 72%, transparent);
+}
+
+.entity-architecture-link-builder {
+  padding: 16px;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--mantine-color-default) 68%, transparent);
+}
+
+.entity-architecture-link-direction {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  margin: 12px auto;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--mantine-color-teal-7);
+  background: var(--mantine-color-teal-light);
+  transform: rotate(90deg);
+}
+
+.entity-architecture-link-kind {
+  width: min(320px, 100%);
+}
+
+.entity-architecture-link-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: 7px;
+  background: var(--mantine-color-body);
+}
+
+.entity-architecture-link-endpoint {
+  min-width: 0;
+}
+
+.entity-architecture-link-endpoint > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entity-architecture-link-middle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--mantine-color-teal-7);
+}
+
+.entity-architecture-primary-label {
+  color: var(--mantine-color-teal-7);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .05em;
+}
+
+.entity-architecture-canvas-alert {
+  position: absolute;
+  z-index: 8;
+  top: 12px;
+  left: 50%;
+  width: min(720px, calc(100% - 32px));
+  transform: translateX(-50%);
+  box-shadow: var(--mantine-shadow-sm);
+}
+
+.entity-architecture-table-selection {
+  padding: 14px;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--mantine-color-default) 70%, transparent);
+}
+
+.entity-architecture-browser-list {
+  display: grid;
+  gap: 6px;
+  max-height: 430px;
+  overflow: auto;
+}
+
+.entity-architecture-browser-row,
+.entity-architecture-table-choice {
+  appearance: none;
+  width: 100%;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: 6px;
+  color: var(--mantine-color-text);
+  background: var(--mantine-color-body);
+  cursor: pointer;
+  text-align: left;
+}
+
+.entity-architecture-browser-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 58px;
+  padding: 9px 11px;
+}
+
+.entity-architecture-browser-row:hover,
+.entity-architecture-table-choice:hover {
+  border-color: var(--mantine-color-blue-5);
+  background: color-mix(in srgb, var(--mantine-color-blue-light) 42%, var(--mantine-color-body));
+}
+
+.entity-architecture-browser-icon {
+  display: grid;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 6px;
+  color: var(--mantine-color-blue-6);
+  background: var(--mantine-color-blue-light);
+}
+
+.entity-architecture-browser-copy {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.entity-architecture-browser-copy small {
+  overflow: hidden;
+  color: var(--mantine-color-dimmed);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entity-architecture-table-browser {
+  height: calc(100dvh - 96px);
+}
+
+.entity-architecture-table-browser-toolbar {
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--mantine-color-default-border);
+}
+
+.entity-architecture-table-browser-scroll {
+  flex: 1;
+  min-height: 0;
+}
+
+.entity-architecture-table-choice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 9px 11px;
+}
+
+.entity-architecture-table-choice span {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entity-architecture-table-choice.is-selected {
+  border-color: var(--mantine-color-blue-6);
+  background: var(--mantine-color-blue-light);
+}
+
+.entity-architecture-table-browser-footer {
+  padding-top: 12px;
+  border-top: 1px solid var(--mantine-color-default-border);
+}
+
+.entity-field-workspace-modal {
+  background: var(--mantine-color-body);
+}
+
+.entity-field-workspace-modal-body {
+  height: 100dvh;
+  padding: 0;
+  overflow: hidden;
+}
+
+.entity-field-workspace {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  height: 100dvh;
+  color: var(--mantine-color-text);
+  background: color-mix(in srgb, var(--mantine-color-default) 28%, var(--mantine-color-body));
+}
+
+.entity-field-workspace-head,
+.entity-field-workspace-context,
+.entity-field-workspace-footer {
+  background: var(--mantine-color-body);
+}
+
+.entity-field-workspace-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-height: 76px;
+  padding: 12px 22px;
+  border-bottom: 1px solid var(--mantine-color-default-border);
+}
+
+.entity-field-workspace-context {
+  display: grid;
+  grid-template-columns: minmax(220px, .85fr) minmax(220px, .85fr) minmax(260px, 1.2fr) auto;
+  align-items: end;
+  gap: 12px;
+  padding: 12px 22px 14px;
+  border-bottom: 1px solid var(--mantine-color-default-border);
+}
+
+.entity-field-workspace-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(82px, 1fr));
+  overflow: hidden;
+  min-height: 58px;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: 7px;
+}
+
+.entity-field-workspace-metrics > div {
+  display: grid;
+  align-content: center;
+  min-width: 88px;
+  padding: 7px 12px;
+  border-left: 1px solid var(--mantine-color-default-border);
+}
+
+.entity-field-workspace-metrics > div:first-child {
+  border-left: 0;
+}
+
+.entity-field-workspace-metrics small,
+.entity-field-preview small {
+  color: var(--mantine-color-dimmed);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .05em;
+}
+
+.entity-field-workspace-metrics b {
+  font-variant-numeric: tabular-nums;
+  font-size: 17px;
+}
+
+.entity-field-workspace-content {
+  min-height: 0;
+  padding: 14px 22px;
+  overflow: auto;
+}
+
+.entity-field-workspace-state {
+  display: grid;
+  min-height: 260px;
+  place-content: center;
+  place-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.entity-field-workspace-state.is-error {
+  color: var(--mantine-color-red-7);
+}
+
+.entity-field-list {
+  display: grid;
+  gap: 8px;
+}
+
+.entity-field-row {
+  overflow: hidden;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: 7px;
+  background: var(--mantine-color-body);
+  box-shadow: 0 1px 1px color-mix(in srgb, var(--mantine-color-black) 4%, transparent);
+}
+
+.entity-field-row.is-expanded {
+  border-color: color-mix(in srgb, var(--mantine-color-blue-5) 64%, var(--mantine-color-default-border));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--mantine-color-blue-5) 12%, transparent);
+}
+
+.entity-field-row-summary {
+  display: grid;
+  grid-template-columns: auto minmax(170px, 1fr) minmax(170px, .9fr) minmax(250px, 1.15fr) minmax(145px, .7fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 62px;
+  padding: 8px 12px;
+}
+
+.entity-field-expand {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 5px;
+  color: var(--mantine-color-dimmed);
+  background: transparent;
+  cursor: pointer;
+}
+
+.entity-field-expand:hover {
+  color: var(--mantine-color-blue-7);
+  background: var(--mantine-color-blue-light);
+}
+
+.entity-field-identity,
+.entity-field-classification,
+.entity-field-dependency {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.entity-field-identity b {
+  overflow: hidden;
+  font-family: var(--font-mono, Consolas), monospace;
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entity-field-identity small,
+.entity-field-classification span,
+.entity-field-rule-summary small {
+  color: var(--mantine-color-dimmed);
+  font-size: 10px;
+}
+
+.entity-field-classification {
+  justify-items: start;
+}
+
+.entity-field-rule-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.entity-field-rule-summary > span {
+  display: grid;
+  min-width: 0;
+}
+
+.entity-field-rule-summary b {
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entity-field-row-details {
+  display: grid;
+  grid-template-columns: minmax(0, 1.12fr) minmax(0, .88fr);
+  gap: 14px;
+  padding: 14px;
+  border-top: 1px solid var(--mantine-color-default-border);
+  background: color-mix(in srgb, var(--mantine-color-blue-light) 12%, var(--mantine-color-body));
+}
+
+.entity-field-row-details > section {
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: 7px;
+  background: var(--mantine-color-body);
+}
+
+.entity-field-control-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.entity-field-control-grid.is-generation {
+  grid-template-columns: minmax(180px, 1.25fr) minmax(140px, 1fr) minmax(140px, 1fr);
+}
+
+.entity-field-preview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(180px, .8fr);
+  align-items: end;
+  gap: 10px;
+}
+
+.entity-field-preview > div:last-child {
+  display: grid;
+  min-height: 58px;
+  align-content: center;
+  padding: 7px 11px;
+  overflow: hidden;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--mantine-color-teal-light) 24%, var(--mantine-color-body));
+}
+
+.entity-field-preview > div:last-child b {
+  overflow: hidden;
+  font-family: var(--font-mono, Consolas), monospace;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entity-field-warning,
+.entity-field-ri-note {
+  margin-top: 10px;
+  border-radius: 6px;
+}
+
+.entity-field-warning {
+  padding: 8px 10px;
+  color: var(--mantine-color-yellow-9);
+  background: var(--mantine-color-yellow-light);
+}
+
+.entity-field-ri-note {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 10px;
+  color: var(--mantine-color-violet-8);
+  background: var(--mantine-color-violet-light);
+}
+
+.entity-field-ri-note > div {
+  display: grid;
+}
+
+.entity-field-ri-note small {
+  color: var(--mantine-color-dimmed);
+  font-size: 10px;
+}
+
+.entity-field-workspace-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  min-height: 62px;
+  padding: 10px 22px;
+  border-top: 1px solid var(--mantine-color-default-border);
+}
+
+.entity-field-workspace-footer > p {
+  max-width: 920px;
+}
+
+@media (max-width: 900px) {
+  .entity-architecture-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .entity-architecture-canvas,
+  .entity-architecture-empty {
+    height: 68dvh;
+  }
+
+  .entity-architecture-link-row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .entity-architecture-link-middle {
+    grid-column: 1 / -1;
+  }
+
+  .entity-field-workspace-head,
+  .entity-field-workspace-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .entity-field-workspace-context,
+  .entity-field-row-summary,
+  .entity-field-row-details,
+  .entity-field-control-grid,
+  .entity-field-control-grid.is-generation,
+  .entity-field-preview {
+    grid-template-columns: 1fr;
+  }
+
+  .entity-field-workspace-metrics {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}

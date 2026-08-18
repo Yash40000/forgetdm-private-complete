@@ -1,0 +1,634 @@
+================================================================================
+DATABASE CONCEPTS CHEATSHEET  —  Q&A style, generic → engine-specific
+Covers: SQL, joins, keys, normalization, indexing, partitioning, loading,
+transactions/isolation, locking/concurrency, query optimization/plans,
+replication/HA, sharding, NoSQL, and TDM-relevant angles.
+Engines referenced: PostgreSQL, Oracle, SQL Server, MySQL, Db2.
+================================================================================
+
+
+================================================================================
+SECTION 1 — SQL FUNDAMENTALS
+================================================================================
+
+Q1. Categories of SQL commands?
+- DDL (Data Definition): CREATE, ALTER, DROP, TRUNCATE — structure. Auto-commit
+  in most engines (careful: TRUNCATE/DROP can't be rolled back in some).
+- DML (Data Manipulation): INSERT, UPDATE, DELETE, MERGE — rows.
+- DQL (Query): SELECT.
+- DCL (Control): GRANT, REVOKE — privileges.
+- TCL (Transaction): COMMIT, ROLLBACK, SAVEPOINT.
+
+Q2. Logical order of execution of a SELECT (NOT the written order)?
+FROM -> ON/JOIN -> WHERE -> GROUP BY -> HAVING -> SELECT -> DISTINCT ->
+ORDER BY -> LIMIT/OFFSET.
+Key point: WHERE filters rows BEFORE grouping; HAVING filters AFTER grouping.
+You cannot reference a SELECT alias in WHERE (alias not resolved yet) but can in
+ORDER BY.
+
+Q3. WHERE vs HAVING?
+WHERE filters individual rows before aggregation. HAVING filters groups after
+aggregation (use with GROUP BY / aggregate functions).
+
+Q4. DELETE vs TRUNCATE vs DROP?
+- DELETE: row-by-row, logged, WHERE allowed, fires triggers, can roll back, keeps
+  structure. Slow on large tables.
+- TRUNCATE: deallocates pages/extents, minimal logging, no WHERE, resets identity,
+  much faster, usually can't be rolled back (Postgres: transactional; Oracle: DDL
+  auto-commit; SQL Server: can roll back inside a transaction).
+- DROP: removes the table object entirely (structure + data).
+
+Q5. NULL behaviour gotchas?
+- NULL = unknown. NULL = NULL is NOT true; use IS NULL / IS NOT NULL.
+- Aggregates (SUM/AVG/COUNT(col)) ignore NULLs; COUNT(*) counts all rows.
+- NULL in NOT IN (...) can silently return zero rows — classic bug. Prefer NOT EXISTS.
+- Arithmetic/concat with NULL yields NULL (unless COALESCE/NVL used).
+
+Q6. UNION vs UNION ALL?
+UNION removes duplicates (adds a sort/hash dedup cost). UNION ALL keeps all rows,
+faster. Use UNION ALL unless you specifically need de-duplication.
+
+Q7. COALESCE vs NVL vs ISNULL?
+All return first non-null. COALESCE is ANSI-standard (all engines, N args).
+NVL = Oracle (2 args). ISNULL = SQL Server (2 args). Prefer COALESCE for portability.
+
+Q8. Window function vs GROUP BY?
+GROUP BY collapses rows into one per group. Window functions
+(OVER (PARTITION BY ... ORDER BY ...)) compute across a group but KEEP every row.
+Examples: ROW_NUMBER(), RANK(), DENSE_RANK(), LAG()/LEAD(), SUM() OVER (running total).
+Interview classic: "top N per group" = ROW_NUMBER() OVER (PARTITION BY g ORDER BY x)
+then filter rn <= N.
+
+Q9. CTE (WITH) vs subquery vs temp table?
+- CTE: named inline subquery, improves readability, can be recursive. May or may not
+  be materialized (Postgres <12 materialized; 12+ can inline).
+- Subquery: inline in FROM/WHERE/SELECT.
+- Temp table: physically stored, good when reused many times / stats needed.
+
+Q10. Recursive CTE — use case?
+Hierarchies/graphs: org charts, bill-of-materials, folder trees, referential-path
+walking (relevant to TDM subset extraction). Anchor member UNION ALL recursive member.
+
+
+================================================================================
+SECTION 2 — JOINS
+================================================================================
+
+Q11. Join types?
+- INNER: only matching rows in both.
+- LEFT (OUTER): all left rows + matches; non-matches -> NULL on right.
+- RIGHT (OUTER): mirror of LEFT.
+- FULL OUTER: all rows both sides; non-matches NULL on the missing side.
+- CROSS: Cartesian product (every combination) — no ON clause.
+- SELF: table joined to itself (e.g., employee-manager).
+- Natural join: auto-joins on same-named columns — AVOID (fragile, implicit).
+
+Q12. When to use each?
+INNER = "only where both exist". LEFT = "keep everything on the left even if no
+match" (e.g., customers with/without orders). FULL OUTER = reconciliation / find
+rows present in one side but not the other (great for data-comparison / masking
+validation: LEFT/RIGHT-only rows = mismatches).
+
+Q13. Anti-join / semi-join?
+- Semi-join: rows in A that HAVE a match in B — EXISTS / IN.
+- Anti-join: rows in A with NO match in B — NOT EXISTS / LEFT JOIN ... WHERE b.key
+  IS NULL. Prefer NOT EXISTS over NOT IN (NULL-safe).
+
+Q14. Physical join algorithms (what the optimizer picks)?
+- Nested Loop: for each outer row, probe inner (good for small outer + indexed inner).
+- Hash Join: build hash table on smaller input, probe with larger (best for big,
+  unsorted, equality joins).
+- Merge (Sort-Merge) Join: both inputs sorted on join key, merged (good when already
+  sorted / range joins). You see these in EXPLAIN plans.
+
+Q15. Why can a LEFT JOIN behave like INNER by mistake?
+Putting a right-table predicate in WHERE (WHERE b.col = x) filters out the NULLs the
+LEFT JOIN produced. Put such predicates in the ON clause instead.
+
+
+================================================================================
+SECTION 3 — KEYS, CONSTRAINTS, RELATIONSHIPS
+================================================================================
+
+Q16. Primary key vs unique key?
+PK: uniquely identifies a row, NOT NULL, one per table, usually clustered. Unique:
+enforces uniqueness but allows (typically) one NULL (engine-dependent; SQL Server
+allows one NULL, Oracle allows multiple NULLs). Multiple unique keys allowed.
+
+Q17. Foreign key?
+Column(s) referencing a PK/unique key in another (or same) table — enforces
+referential integrity. Actions: ON DELETE/UPDATE CASCADE | SET NULL | RESTRICT |
+NO ACTION. TDM note: masking a PK requires the FK values to change identically
+(deterministic/FPE) or the relationship breaks.
+
+Q18. Natural key vs surrogate key?
+Natural = business-meaningful (SSN, email). Surrogate = system-generated
+(identity/sequence/UUID), no business meaning. Surrogates preferred for stability
+(business values change; SSN is reused/erased under GDPR).
+
+Q19. Constraint types?
+NOT NULL, UNIQUE, PRIMARY KEY, FOREIGN KEY, CHECK (value rule), DEFAULT. CHECK is
+where format validation lives (e.g., status IN ('OPEN','CLOSED')).
+
+Q20. Composite key?
+PK/index spanning multiple columns. Column ORDER matters for index usability
+(leftmost-prefix rule — see indexing).
+
+Q21. Identity / auto-increment / sequence?
+- SQL Server: IDENTITY / SEQUENCE. MySQL: AUTO_INCREMENT. Postgres: SERIAL/IDENTITY
+  (GENERATED ... AS IDENTITY). Oracle: SEQUENCE (+ 12c IDENTITY). Db2: IDENTITY/SEQUENCE.
+- Gaps are normal (rollbacks/caching) — don't rely on contiguity.
+
+
+================================================================================
+SECTION 4 — NORMALIZATION & DATA MODELING
+================================================================================
+
+Q22. Normal forms (short)?
+- 1NF: atomic values, no repeating groups.
+- 2NF: 1NF + no partial dependency (non-key depends on WHOLE composite key).
+- 3NF: 2NF + no transitive dependency (non-key depends only on the key).
+- BCNF: stricter 3NF (every determinant is a candidate key).
+- 4NF/5NF: multivalued / join dependencies (rare in practice).
+Mnemonic: "the key, the whole key, and nothing but the key."
+
+Q23. Normalization vs denormalization — trade-off?
+Normalize (OLTP): less redundancy, fewer update anomalies, more joins.
+Denormalize (OLAP/reporting): precomputed/duplicated data, fewer joins, faster reads,
+but redundancy + update cost. Star schema (facts + dimensions) is deliberate denorm.
+
+Q24. OLTP vs OLAP?
+OLTP: many short read/write transactions, normalized, row-store, high concurrency
+(banking core). OLAP: few large analytical scans, denormalized/columnar, aggregation
+(warehouse/lake). Different indexing/partitioning strategies.
+
+Q25. Star vs snowflake schema?
+Star: central fact table + denormalized dimension tables (fast, simple).
+Snowflake: dimensions further normalized into sub-dimensions (less redundancy, more
+joins).
+
+
+================================================================================
+SECTION 5 — INDEXING
+================================================================================
+
+Q26. What is an index and the trade-off?
+A secondary structure that speeds reads (avoids full scans) at the cost of extra
+storage and slower writes (every INSERT/UPDATE/DELETE maintains the index). Index for
+read paths that matter; don't over-index write-heavy tables.
+
+Q27. Clustered vs non-clustered index?
+- Clustered: table rows physically stored in index order — ONE per table (it IS the
+  table). SQL Server PK default clustered. Oracle equivalent = Index-Organized Table
+  (IOT). Postgres has no true clustered index (CLUSTER is a one-time reorg).
+- Non-clustered / secondary: separate structure with pointers (row locator / PK) back
+  to the data. Many allowed.
+
+Q28. Index data structures?
+- B-tree / B+tree: default; great for equality + range + ORDER BY. Leaf nodes linked
+  for range scans.
+- Hash: equality only, no ranges (Postgres HASH, MySQL MEMORY).
+- Bitmap: low-cardinality columns, great for OLAP/AND-OR predicates (Oracle); bad for
+  high-concurrency OLTP (lock contention).
+- GIN/GiST (Postgres): full-text, JSONB, arrays, geospatial.
+- Columnstore (SQL Server) / column indexes: analytics/aggregation.
+
+Q29. Composite index leftmost-prefix rule?
+Index on (A, B, C) can serve predicates on A, (A,B), (A,B,C) — but NOT on B alone or
+C alone. Order columns by: equality predicates first, then range, then the most
+selective. Column order is a design decision, not arbitrary.
+
+Q30. Covering index?
+An index that contains ALL columns a query needs (key + INCLUDE columns) so the engine
+answers from the index alone — "index-only scan", no table lookup. Big win for hot
+queries.
+
+Q31. Selectivity / cardinality — why it matters?
+Selectivity = fraction of rows a predicate matches. High-cardinality (many distinct
+values, e.g. SSN) = selective = index very useful. Low-cardinality (gender, boolean)
+= index often ignored in favour of a scan (bitmap is the exception).
+
+Q32. When does an index NOT get used?
+- Function/expression on the column: WHERE UPPER(name)=... (use a function-based/
+  expression index).
+- Implicit type conversion (VARCHAR col compared to number).
+- Leading wildcard LIKE '%abc'.
+- Low selectivity (optimizer prefers scan).
+- Stale statistics.
+- OR across un-indexed columns.
+
+Q33. Index fragmentation / maintenance?
+Splits/deletes fragment B-trees over time. Remedies: REBUILD/REORGANIZE (SQL Server),
+REINDEX (Postgres/Oracle), OPTIMIZE TABLE (MySQL). Update statistics regularly
+(ANALYZE / UPDATE STATISTICS / DBMS_STATS).
+
+Q34. Unique vs non-unique index? Filtered/partial index?
+Unique index also enforces uniqueness. Partial/filtered index covers a subset
+(WHERE status='ACTIVE') — smaller, cheaper for skewed queries. (Postgres partial
+index, SQL Server filtered index.)
+
+
+================================================================================
+SECTION 6 — PARTITIONING
+================================================================================
+
+Q35. What is partitioning and why?
+Splitting one logical table into physical pieces by a key. Benefits: partition
+pruning (scan only relevant partitions), faster maintenance (drop/rebuild one
+partition), parallelism, and cheap bulk delete (DROP PARTITION vs DELETE).
+
+Q36. Partitioning strategies?
+- RANGE: by ranges of a value (dates most common — monthly/yearly). Time-series.
+- LIST: by discrete values (region = 'US','EU'...).
+- HASH: by hash of key — even distribution when no natural range (spreads load).
+- COMPOSITE: RANGE-HASH, RANGE-LIST etc. (e.g., range by month, sub-partition hash by
+  customer_id).
+
+Q37. Partition pruning?
+Optimizer skips partitions that can't match the WHERE predicate. Only works if the
+query filters on the partition key. Design partition key to match common filters.
+
+Q38. Partitioning vs sharding?
+Partitioning = within ONE database instance (scale-up / manageability). Sharding =
+horizontal split across MULTIPLE servers/nodes (scale-out). Sharding adds cross-shard
+query + transaction complexity.
+
+Q39. Local vs global index (partitioned tables)?
+- Local index: each partition has its own index (aligned) — maintenance-friendly,
+  drop a partition drops its index piece.
+- Global index: one index spanning all partitions — better for queries not on the
+  partition key, but a partition drop invalidates it.
+
+Q40. Common partitioning pitfalls?
+- Choosing a key that queries don't filter on -> no pruning.
+- Skew (one partition huge) with LIST/RANGE -> hot partition.
+- Too many tiny partitions -> planning overhead.
+- Partition key must usually be part of the PK/unique key.
+
+
+================================================================================
+SECTION 7 — DATA LOADING (BULK / ETL)
+================================================================================
+
+Q41. Fastest way to bulk load?
+Use native bulk loaders, not row-by-row INSERT:
+- Postgres: COPY (or \copy) — orders of magnitude faster than INSERT.
+- Oracle: SQL*Loader (direct path), external tables, INSERT /*+ APPEND */.
+- SQL Server: BULK INSERT, bcp, SqlBulkCopy.
+- MySQL: LOAD DATA INFILE.
+- Db2: LOAD utility (vs IMPORT which is logged INSERTs).
+
+Q42. Techniques to speed a large load?
+- Drop/disable non-clustered indexes + FKs, load, then rebuild/re-enable + revalidate.
+- Disable triggers during load.
+- Minimal/bulk-logged recovery mode (SQL Server), NOLOGGING/direct-path (Oracle),
+  unlogged tables (Postgres) — less WAL/redo (trade durability during load).
+- Batch commits (avoid one giant transaction AND avoid per-row commit).
+- Load in PK/cluster order to reduce page splits.
+- Parallelism / multiple streams.
+- Presort data; partition-wise loads (load into a staging partition then EXCHANGE/
+  ATTACH PARTITION — near-instant publish).
+
+Q43. Idempotent / restartable loads?
+Use staging tables + MERGE/UPSERT (ON CONFLICT / MERGE) so re-runs don't duplicate.
+Track a high-water mark (checkpoint) for restartability (this is what incremental
+sync / CDC do).
+
+Q44. INSERT vs MERGE (UPSERT)?
+MERGE handles insert-or-update in one pass against a target. Postgres:
+INSERT ... ON CONFLICT DO UPDATE. MySQL: INSERT ... ON DUPLICATE KEY UPDATE. Oracle/
+SQL Server/Db2: MERGE.
+
+Q45. ETL vs ELT?
+ETL: transform before load (classic warehouse). ELT: load raw then transform inside
+the target (modern lake/warehouse with cheap compute). TDM masking is typically an
+extract-transform(mask)-load flow; mask-on-extract prevents raw PII landing in target.
+
+Q46. Referential integrity during bulk load?
+Load parents before children, or disable FK checks during load then re-validate (and
+handle any orphans). Coordinated/point-in-time extraction keeps cross-table state
+consistent.
+
+
+================================================================================
+SECTION 8 — TRANSACTIONS, ACID, ISOLATION
+================================================================================
+
+Q47. ACID?
+- Atomicity: all-or-nothing.
+- Consistency: moves DB from one valid state to another (constraints hold).
+- Isolation: concurrent txns don't corrupt each other's view.
+- Durability: committed data survives crash (WAL/redo log + flush).
+
+Q48. Read phenomena (what isolation prevents)?
+- Dirty read: reading another txn's uncommitted change.
+- Non-repeatable read: same row read twice gives different values (someone updated +
+  committed in between).
+- Phantom read: same query returns different SET of rows (someone inserted/deleted).
+- Lost update / write skew: concurrent updates clobber each other.
+
+Q49. Isolation levels (ANSI)?
+- READ UNCOMMITTED: allows dirty reads (rarely used).
+- READ COMMITTED: no dirty reads; non-repeatable + phantoms possible. (Default in
+  Postgres, Oracle, SQL Server.)
+- REPEATABLE READ: no dirty/non-repeatable; phantoms possible (MySQL InnoDB default;
+  InnoDB also blocks phantoms via next-key locks).
+- SERIALIZABLE: full isolation, as if txns ran one at a time (Postgres uses SSI —
+  Serializable Snapshot Isolation).
+
+Q50. MVCC (Multi-Version Concurrency Control)?
+Readers see a consistent snapshot without blocking writers; writers create new row
+versions instead of overwriting. Postgres/Oracle/MySQL-InnoDB use MVCC. Cost:
+version cleanup — Postgres VACUUM (dead tuples/bloat), Oracle UNDO segments (ORA-1555
+"snapshot too old" if undo recycled).
+
+Q51. Optimistic vs pessimistic concurrency?
+- Pessimistic: lock first (SELECT ... FOR UPDATE), block others. Good for high-
+  contention.
+- Optimistic: don't lock; check a version/timestamp at commit and retry on conflict.
+  Good for low-contention/high-throughput (typical web apps).
+
+Q52. Savepoint?
+A named point inside a transaction you can partially roll back to
+(ROLLBACK TO SAVEPOINT) without aborting the whole transaction.
+
+Q53. Two-phase commit (2PC)?
+Distributed transaction protocol: PREPARE (all participants vote) then COMMIT/ABORT.
+Guarantees atomicity across systems but is slow and can block on coordinator failure.
+
+
+================================================================================
+SECTION 9 — LOCKING & CONCURRENCY
+================================================================================
+
+Q54. Lock granularity?
+Row < page < table. Finer = more concurrency, more overhead. Engines may escalate
+row locks to a table lock under pressure (SQL Server lock escalation).
+
+Q55. Shared vs exclusive lock?
+Shared (S, read) — many readers coexist. Exclusive (X, write) — one writer, blocks
+others. Update (U) lock is an intent-to-write shared lock to avoid deadlocks.
+
+Q56. Deadlock — what and how to handle?
+Two txns each hold a lock the other needs -> cycle. Engine detects and kills a victim
+(rolls it back). Prevention: access objects in a consistent order, keep transactions
+short, use lower isolation where safe, add proper indexes (fewer rows locked), retry
+the victim in app code.
+
+Q57. Blocking vs deadlock?
+Blocking = one waits for another (resolves when the other commits). Deadlock =
+mutual, unresolvable without killing one. Long blocking often signals a missing index
+or an over-long transaction.
+
+Q58. SELECT ... FOR UPDATE?
+Pessimistic row lock to reserve rows you intend to update (prevents lost updates).
+Relevant to "data reservation" concepts.
+
+
+================================================================================
+SECTION 10 — QUERY OPTIMIZATION & EXECUTION PLANS
+================================================================================
+
+Q59. How to see and read a plan?
+- EXPLAIN / EXPLAIN ANALYZE (Postgres — ANALYZE actually runs it, shows real rows/time).
+- EXPLAIN PLAN + DBMS_XPLAN / AUTOTRACE (Oracle).
+- SET SHOWPLAN / "Include Actual Execution Plan" (SQL Server).
+- EXPLAIN / EXPLAIN ANALYZE (MySQL 8).
+Read: look for Seq/Full Scan on big tables, wrong join type, huge estimated-vs-actual
+row mismatch (bad stats), missing index, expensive sort/spill to disk.
+
+Q60. Cost-based optimizer (CBO)?
+Uses table/index STATISTICS (row counts, distinct values, histograms) to estimate the
+cheapest plan. Stale stats -> bad estimates -> bad plans. Keep stats fresh (ANALYZE /
+DBMS_STATS / UPDATE STATISTICS / auto-stats).
+
+Q61. Common causes of slow queries?
+- Full table scan where an index should be used.
+- Non-SARGable predicate (function on column, implicit cast, leading wildcard).
+- Missing/wrong index or wrong composite order.
+- Stale statistics -> bad row estimates.
+- Bad join order / join type; huge intermediate results.
+- N+1 query pattern from the app.
+- Sort/hash spilling to disk (low work_mem/sort area).
+- Parameter sniffing (SQL Server) — plan cached for atypical param.
+
+Q62. SARGable predicate?
+"Search-ARGument-able" = can use an index. WHERE col = @x is SARGable;
+WHERE FUNC(col) = @x or WHERE col+0 = @x is not. Rewrite to expose the raw column
+(or add an expression index).
+
+Q63. How to fix a slow query — method?
+1. Get the actual plan. 2. Find the biggest operator (rows/time). 3. Check
+estimate-vs-actual (stats). 4. Add/adjust index or make predicate SARGable. 5. Reduce
+data early (filter/aggregate before join). 6. Re-check plan. Measure, don't guess.
+
+Q64. Query hints — when?
+Last resort to force index/join/parallelism when the optimizer is wrong (e.g., Oracle
+/*+ INDEX(t idx) */, SQL Server OPTION (RECOMPILE)). Prefer fixing stats/indexes;
+hints are brittle across data growth.
+
+Q65. Materialized view?
+Precomputed, stored query result refreshed on demand/schedule — trades staleness for
+fast reads on expensive aggregations. (Postgres MATERIALIZED VIEW, Oracle MV with
+query rewrite, SQL Server indexed view.)
+
+
+================================================================================
+SECTION 11 — REPLICATION, HA, BACKUP
+================================================================================
+
+Q66. Replication types?
+- Synchronous: commit waits for replica ack -> zero data loss, higher latency.
+- Asynchronous: commit returns immediately, replica catches up -> possible small data
+  loss on failover, lower latency.
+- Physical (block/WAL) vs logical (row-level, cross-version/selective).
+
+Q67. Log-based CDC vs trigger-based CDC vs query-based?
+- Log-based: read the transaction log (Postgres logical replication / WAL, Oracle
+  LogMiner/redo, SQL Server CDC, MySQL binlog, Db2 ASN). Low overhead, no table
+  rescan, captures every change. Best.
+- Trigger-based: triggers write change rows to a shadow table. More overhead, intrusive.
+- Query/timestamp-based: poll WHERE updated_at > checkpoint. Simple but misses deletes
+  and needs a reliable timestamp.
+
+Q68. WAL / redo log / transaction log — role?
+Write-ahead logging: changes written to the log BEFORE data pages (durability +
+crash recovery + replication + PITR). Checkpoints flush dirty pages so log can be
+reclaimed. Idle replication slots pinning WAL is a real operational hazard.
+
+Q69. Backup types?
+Full, differential (changes since last full), incremental (changes since last any
+backup), and log backups (enable Point-In-Time Recovery). RPO (how much data you can
+lose) vs RTO (how fast you must recover) drive the strategy.
+
+Q70. High availability patterns?
+Primary-replica failover, clustering (shared-disk e.g. Oracle RAC, or shared-nothing),
+quorum/consensus (Raft/Paxos) for automatic leader election. Read replicas offload
+reporting.
+
+
+================================================================================
+SECTION 12 — SCALING & DISTRIBUTED
+================================================================================
+
+Q71. Vertical vs horizontal scaling?
+Vertical = bigger box (simple, ceiling + single point of failure). Horizontal = more
+boxes (sharding/replicas; complexity in routing + distributed txns).
+
+Q72. Sharding strategies?
+Range, hash, or directory-based (lookup service). Watch: hot shards (skew),
+cross-shard joins/transactions, resharding pain. Pick a shard key with even
+distribution and that matches access patterns.
+
+Q73. CAP theorem?
+In a network partition you can keep only 2 of {Consistency, Availability, Partition-
+tolerance}; partitions are unavoidable, so it's really CP vs AP. Traditional RDBMS
+lean CP; many NoSQL lean AP (eventual consistency).
+
+Q74. BASE vs ACID?
+BASE = Basically Available, Soft state, Eventual consistency (NoSQL trade-off for
+availability/scale). ACID = strong consistency (RDBMS).
+
+Q75. Read replica lag — impact?
+Async replicas can be stale; "read your own write" can fail. Mitigate with
+read-from-primary for critical reads or session/causal consistency.
+
+
+================================================================================
+SECTION 13 — NoSQL & DATA TYPES
+================================================================================
+
+Q76. NoSQL families?
+- Key-value (Redis, DynamoDB): fast lookups by key.
+- Document (MongoDB, Couchbase): JSON docs, flexible schema.
+- Wide-column (Cassandra, HBase): huge write throughput, query-driven modeling.
+- Graph (Neo4j): relationships/traversal.
+Choose by access pattern, not hype. RDBMS still wins for complex joins + strong
+consistency + ad-hoc query.
+
+Q77. When RDBMS over NoSQL?
+Strong consistency, multi-row transactions, complex joins/ad-hoc analytics, mature
+tooling, referential integrity. NoSQL when massive scale, flexible schema, simple
+access patterns, or availability > consistency.
+
+Q78. JSON in relational DBs?
+Postgres JSONB (indexable via GIN), SQL Server JSON functions, Oracle JSON type,
+MySQL JSON. Good for semi-structured/sparse attributes without schema churn — but
+don't abandon relational modeling for everything.
+
+Q79. Common data types & pitfalls?
+- CHAR (fixed, padded) vs VARCHAR (variable). Fixed-width matters for mainframe/
+  COBOL layouts.
+- NUMERIC/DECIMAL (exact — money!) vs FLOAT/REAL (approximate — never for money).
+- DATE vs TIMESTAMP vs TIMESTAMP WITH TIME ZONE (store UTC; convert at edges).
+- Watch implicit conversions (kills index use) and collation mismatches (join/compare
+  failures across engines).
+
+
+================================================================================
+SECTION 14 — VIEWS, PROCEDURES, TRIGGERS
+================================================================================
+
+Q80. View vs materialized view?
+View = stored query, always live, no storage (except indexed views). Materialized view
+= stored result, fast reads, needs refresh.
+
+Q81. Stored procedure vs function?
+Procedure: performs actions (DML), may return multiple/no results, called with EXEC/CALL.
+Function: returns a value, usable in SELECT, ideally side-effect free.
+
+Q82. Trigger — and the caution?
+Code that fires automatically on INSERT/UPDATE/DELETE (BEFORE/AFTER, row/statement).
+Uses: audit, derived columns, enforcing rules. Caution: hidden performance cost,
+cascading triggers, hard to debug, and they can interfere with bulk loads
+(disable during load).
+
+
+================================================================================
+SECTION 15 — SECURITY & TDM-RELEVANT
+================================================================================
+
+Q83. SQL injection — cause and fix?
+Cause: concatenating user input into SQL. Fix: parameterized queries / prepared
+statements, least-privilege DB accounts, input validation, stored procs. Never build
+SQL by string concat.
+
+Q84. GRANT/REVOKE, roles, least privilege?
+Grant only needed privileges, prefer roles over per-user grants, separate app vs admin
+accounts, no shared credentials. Row-Level Security (Postgres RLS, Oracle VPD, SQL
+Server RLS) filters rows per user.
+
+Q85. Data masking (in DB context)?
+- Static masking: persist a de-identified COPY (TDM standard for non-prod).
+- Dynamic masking: mask at query time by role; underlying data unchanged.
+Deterministic masking + shared key = same input -> same output everywhere, preserving
+cross-system referential integrity. FPE for PKs/fixed-width (bijective, no collisions,
+same format).
+
+Q86. TDE (Transparent Data Encryption) vs column encryption vs masking?
+- TDE: encrypts data AT REST (files/pages) — protects stolen disks, transparent to
+  queries; does NOT hide data from authorized users.
+- Column/cell encryption: specific sensitive columns encrypted.
+- Masking: de-identifies the VALUES for non-prod/limited-role use.
+Different problems: TDE = storage theft; masking = exposure to test/dev/limited users.
+
+Q87. Subsetting (DB angle)?
+Referentially-complete slice via driver table + FK walk (extract paths). Keep parent/
+child consistent; coordinated/point-in-time extract avoids cross-table skew.
+
+
+================================================================================
+SECTION 16 — QUICK ENGINE DIFFERENCES (CHEAT TABLE)
+================================================================================
+
+Feature            | Postgres        | Oracle           | SQL Server       | MySQL(InnoDB)   | Db2
+-------------------|-----------------|------------------|------------------|-----------------|----------------
+Auto id            | IDENTITY/SERIAL | SEQUENCE/IDENTITY| IDENTITY/SEQUENCE| AUTO_INCREMENT  | IDENTITY/SEQUENCE
+Top-N              | LIMIT n         | FETCH FIRST n / ROWNUM | TOP n / OFFSET-FETCH | LIMIT n | FETCH FIRST n
+String concat      | ||             | ||               | +                | CONCAT()        | ||
+Null-default fn    | COALESCE        | NVL/COALESCE     | ISNULL/COALESCE  | IFNULL/COALESCE | COALESCE
+Upsert             | ON CONFLICT     | MERGE            | MERGE            | ON DUPLICATE KEY| MERGE
+Bulk load          | COPY            | SQL*Loader/ext   | BULK INSERT/bcp  | LOAD DATA INFILE| LOAD
+Default isolation  | READ COMMITTED  | READ COMMITTED   | READ COMMITTED   | REPEATABLE READ | CURSOR STABILITY
+MVCC               | Yes (VACUUM)    | Yes (UNDO)       | Optional (RCSI)  | Yes             | Yes(currently committed)
+Clustered index    | No (heap+CLUSTER one-off)| IOT      | Yes (default PK) | Yes (PK is clustered)| Yes(clustering index)
+Log-based CDC      | logical/WAL slot| LogMiner/redo    | CDC/CT           | binlog          | ASN capture
+Identifier case    | folds lower     | folds UPPER      | as-stored        | platform-dep    | folds UPPER
+
+Note: cross-engine apply must reconcile identifier case (Oracle UPPER vs Postgres
+lower) or joins/applies silently mismatch.
+
+
+================================================================================
+SECTION 17 — RAPID ONE-LINERS (LIGHTNING ROUND)
+================================================================================
+
+- DELETE keeps structure; DROP removes the table; TRUNCATE empties fast (no WHERE).
+- WHERE before GROUP BY; HAVING after.
+- UNION dedups; UNION ALL doesn't (faster).
+- Prefer NOT EXISTS over NOT IN (NULL-safe).
+- Index helps reads, hurts writes; index high-cardinality read paths.
+- Composite index = leftmost-prefix rule; equality cols first, then range.
+- Covering index -> index-only scan (no table lookup).
+- Clustered index defines physical order; one per table.
+- Partition to prune scans + cheap partition drop; needs filter on partition key.
+- Bulk load: native loader + drop indexes/FKs + minimal logging + batch commits.
+- ACID = Atomicity, Consistency, Isolation, Durability.
+- Isolation ladder: RU -> RC -> RR -> SERIALIZABLE (prevents more phenomena, less
+  concurrency).
+- MVCC = readers don't block writers via row versions (Postgres VACUUM, Oracle UNDO).
+- Deadlock -> engine kills a victim; prevent via consistent lock order + short txns.
+- SARGable = index-usable; no functions/casts on the indexed column.
+- CBO needs fresh statistics; stale stats = bad plans.
+- Sync replication = no data loss/slower; async = faster/possible loss.
+- Log-based CDC = read the txn log, no rescan, captures deletes.
+- WAL/redo written before data pages = durability + PITR + replication.
+- CAP: under partition, choose Consistency or Availability.
+- DECIMAL for money, never FLOAT.
+- Static masking persists a copy; dynamic masking hides at query time by role.
+- Deterministic masking + shared seed = cross-system referential integrity survives.
+- FPE for primary keys / fixed-width: same format, unique, no collisions.
+
+================================================================================
+END OF CHEATSHEET
+================================================================================

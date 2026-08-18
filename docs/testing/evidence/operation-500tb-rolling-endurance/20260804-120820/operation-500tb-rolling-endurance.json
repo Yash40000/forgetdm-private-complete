@@ -1,0 +1,37 @@
+{
+  "operation" : "OPERATION_500TB_ROLLING_ENDURANCE",
+  "status" : "PASS",
+  "startedAt" : "2026-08-04T16:10:47.596657Z",
+  "updatedAt" : "2026-08-04T16:11:55.698980800Z",
+  "plannedMinutes" : 1,
+  "reportIntervalMinutes" : 1,
+  "batchRows" : 10000,
+  "completedBatches" : 12,
+  "rowsPerEngine" : 120000,
+  "rowsAcrossBothEngines" : 240000,
+  "stagedBytesGenerated" : 8121329,
+  "peakHeapBytes" : 54358824,
+  "failures" : 0,
+  "windows" : [ {
+    "window" : 1,
+    "elapsedMinutes" : 1.05,
+    "rowsPerEngine" : 120000,
+    "rowsAcrossBothEngines" : 240000,
+    "stagedBytes" : 8121329,
+    "generationMillis" : 1743,
+    "postgresLoadMillis" : 9017,
+    "oracleLoadMillis" : 40861,
+    "reconciliationMillis" : 1742,
+    "rowsPerSecondAcrossBothEngines" : 3818,
+    "reconciliation" : {
+      "idSum" : 7200060000,
+      "amountSum" : 122401020000,
+      "rows" : 120000
+    },
+    "peakHeapBytes" : 54358824,
+    "failures" : 0,
+    "status" : "PASS",
+    "recycleMillis" : 2360
+  } ],
+  "claimBoundary" : "Cumulative rolling physical load; not a simultaneously resident 500 TB database."
+}

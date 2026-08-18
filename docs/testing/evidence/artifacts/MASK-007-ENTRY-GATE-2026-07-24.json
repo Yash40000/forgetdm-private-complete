@@ -1,0 +1,19 @@
+﻿{
+    "schemaVersion":  1,
+    "storyId":  "MASK-007",
+    "decision":  "APPROVED",
+    "checkedAt":  "2026-07-24T16:11:21.6593182-04:00",
+    "approvalRecordedAt":  "2026-07-24T15:58:00-04:00",
+    "approvedBy":  "Codex test coordinator (product-owner delegated)",
+    "requestedScopes":  [
+                            "SOURCE_INSPECTION",
+                            "UNIT_TEST"
+                        ],
+    "storySpecification":  "D:\\forgetdm - Copy\\docs\\testing\\cases\\ready\\MASK-007.md",
+    "conditions":  [
+                       "Use synthetic payment-card values only.",
+                       "Prove Luhn validity, brand prefix/length contract, deterministic replay, capacity reporting, and collision-free behavior.",
+                       "Do not contact external systems or paid services.",
+                       "Retain compact evidence without real cardholder data."
+                   ]
+}

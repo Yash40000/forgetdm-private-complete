@@ -1,0 +1,53 @@
+{
+  "operation" : "OPERATION_500TB",
+  "generatedAt" : "2026-08-03T20:26:39.196684Z",
+  "commit" : "20d3102371e0",
+  "verdict" : "LOGICAL_CONTROL_PLANE_PASS_PHYSICAL_CERTIFICATION_PENDING",
+  "physical500TbClaimAllowed" : false,
+  "claimBoundary" : "Local sparse-manifest and bounded-stream evidence is not a measured 500 TB database run.",
+  "environment" : {
+    "host" : "DESKTOP-6AKMC2L",
+    "os" : "Windows 11 10.0",
+    "java" : "21.0.11",
+    "processors" : 8,
+    "maxHeapBytes" : 2654994432
+  },
+  "logicalPlan" : {
+    "requestedDecimalTb" : 500,
+    "totalBytes" : "500000000000000",
+    "equivalentTib" : "454.747",
+    "partitionBytes" : "274877906944",
+    "partitionCount" : 1819,
+    "chunkBytes" : "1073741824",
+    "chunkCount" : 465662,
+    "lastChunkBytes" : "308494336",
+    "averageRowBytes" : "2048",
+    "estimatedRows" : "244140625000",
+    "persistedChunkNumberType" : "INTEGER",
+    "chunkSequenceHeadroom" : 2147017985
+  },
+  "manifest" : {
+    "sha256" : "b669232783a157ee0713885701b8b37329da000d623d53673abd3fe0cfd18d27",
+    "coveredBytes" : "500000000000000",
+    "descriptorWorkingSetBytes" : 32,
+    "visitedChunks" : 465662
+  },
+  "restart" : {
+    "committedBeforeFailure" : 250000,
+    "coveredBytesAfterResume" : "500000000000000",
+    "finalCommittedChunks" : 465662,
+    "replayedChunks" : 215662,
+    "checkpointFileBytes" : 151,
+    "duplicateChunks" : 0
+  },
+  "physicalSample" : {
+    "sha256" : "f17d53b0a0d7968b33c22c7f941c8691c041be00dd5889f5be4998341927be9d",
+    "maxBufferBytes" : 1048576,
+    "bytesProcessed" : 268435456,
+    "projectionIsCertification" : false,
+    "elapsedNanos" : 289258000,
+    "bytesPerSecond" : 928013939,
+    "projected500TbHoursAtLocalMemoryRate" : 149.66
+  },
+  "requiredNextGate" : "Run the staged 1%, 10%, 1 TB, 5 TB, then 500 TB physical qualification on production-equivalent infrastructure."
+}

@@ -1,0 +1,86 @@
+package io.forgetdm.mainframe;
+
+import jakarta.persistence.*;
+import java.time.Instant;
+
+/** A batch mainframe file-masking job: fetch many files, mask, write back to a (same or different) LPAR. */
+@Entity
+@Table(name = "mf_jobs")
+public class MainframeJobEntity {
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY) private Long id;
+    @Column(nullable = false) private String name;
+    @Column(nullable = false) private String status = "PENDING";
+    @Column(name = "source_connection_id") private Long sourceConnectionId;
+    @Column(name = "target_connection_id") private Long targetConnectionId;
+    @Column(name = "masking_seed") private String maskingSeed;
+    @Column(name = "policy_id") private Long policyId;
+    @Column(columnDefinition = "text") private String message;
+    @Column(name = "files_total") private int filesTotal;
+    @Column(name = "files_done") private int filesDone;
+    @Column(name = "records_processed") private long recordsProcessed;
+    @Column(name = "cancel_requested", nullable = false) private boolean cancelRequested;
+    @Column(name = "created_by") private String createdBy;
+    @Column(name = "owner_user_id") private Long ownerUserId;
+    @Column(name = "owner_username") private String ownerUsername;
+    @Column(name = "owner_group_id") private Long ownerGroupId;
+    @Column(name = "visibility") private String visibility = "GROUP";
+    @Column(name = "dataset_id") private Long datasetId;
+    @Column(name = "business_entity_id") private Long businessEntityId;
+    @Column(name = "execution_plan_id") private Long executionPlanId;
+    @Column(name = "run_group_id") private String runGroupId;
+    @Column(name = "manifest_json", columnDefinition = "text") private String manifestJson;
+    @Column(name = "created_at") private Instant createdAt = Instant.now();
+    @Column(name = "started_at") private Instant startedAt;
+    @Column(name = "finished_at") private Instant finishedAt;
+
+    public Long getId() { return id; }
+    public void setId(Long v) { id = v; }
+    public String getName() { return name; }
+    public void setName(String v) { name = v; }
+    public String getStatus() { return status; }
+    public void setStatus(String v) { status = v; }
+    public Long getSourceConnectionId() { return sourceConnectionId; }
+    public void setSourceConnectionId(Long v) { sourceConnectionId = v; }
+    public Long getTargetConnectionId() { return targetConnectionId; }
+    public void setTargetConnectionId(Long v) { targetConnectionId = v; }
+    public String getMaskingSeed() { return maskingSeed; }
+    public void setMaskingSeed(String v) { maskingSeed = v; }
+    public Long getPolicyId() { return policyId; }
+    public void setPolicyId(Long v) { policyId = v; }
+    public String getMessage() { return message; }
+    public void setMessage(String v) { message = v; }
+    public int getFilesTotal() { return filesTotal; }
+    public void setFilesTotal(int v) { filesTotal = v; }
+    public int getFilesDone() { return filesDone; }
+    public void setFilesDone(int v) { filesDone = v; }
+    public long getRecordsProcessed() { return recordsProcessed; }
+    public void setRecordsProcessed(long v) { recordsProcessed = v; }
+    public boolean isCancelRequested() { return cancelRequested; }
+    public void setCancelRequested(boolean v) { cancelRequested = v; }
+    public String getCreatedBy() { return createdBy; }
+    public void setCreatedBy(String v) { createdBy = v; }
+    public Long getOwnerUserId() { return ownerUserId; }
+    public void setOwnerUserId(Long v) { ownerUserId = v; }
+    public String getOwnerUsername() { return ownerUsername; }
+    public void setOwnerUsername(String v) { ownerUsername = v; }
+    public Long getOwnerGroupId() { return ownerGroupId; }
+    public void setOwnerGroupId(Long v) { ownerGroupId = v; }
+    public String getVisibility() { return visibility; }
+    public void setVisibility(String v) { visibility = v; }
+    public Long getDatasetId() { return datasetId; }
+    public void setDatasetId(Long v) { datasetId = v; }
+    public Long getBusinessEntityId() { return businessEntityId; }
+    public void setBusinessEntityId(Long v) { businessEntityId = v; }
+    public Long getExecutionPlanId() { return executionPlanId; }
+    public void setExecutionPlanId(Long v) { executionPlanId = v; }
+    public String getRunGroupId() { return runGroupId; }
+    public void setRunGroupId(String v) { runGroupId = v; }
+    public String getManifestJson() { return manifestJson; }
+    public void setManifestJson(String v) { manifestJson = v; }
+    public Instant getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Instant v) { createdAt = v; }
+    public Instant getStartedAt() { return startedAt; }
+    public void setStartedAt(Instant v) { startedAt = v; }
+    public Instant getFinishedAt() { return finishedAt; }
+    public void setFinishedAt(Instant v) { finishedAt = v; }
+}

@@ -1,0 +1,16 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: forgetdm
+  labels:
+    app.kubernetes.io/name: forgetdm
+spec:
+  to:
+    kind: Service
+    name: forgetdm
+  port:
+    targetPort: http
+  # TLS terminated at the edge; force HTTPS. Swap for reencrypt/passthrough if the pod serves TLS.
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
